@@ -40,27 +40,29 @@ def si_worker(inputs):
     month_convert = {0:2,1:1,2:12,3:11,4:10,5:9,6:8}
     cal_month = month_convert[shifts]
     d_i,d_t,d_c,d_f= sent_si_model(in_bond, out_bond,net_file, prop_size, b_b, b_w, d, seed, T, max_infected,deltaT,min_inc,alpha,P,cal_month)
+    scc_seeds = seed_in_scc(in_bond,out_bond)
     s_list = {}
     #now, get monthly data 
     for n in d_i:
-        d_ni = d_i[n]
-        d_nc = d_c[n]
-        d_nt = d_t[n]
-        d_nf = d_f[n]
-        s_list = {
-                  'sentinel':n,
-                  'seed':seed,
-                  'd_t':d_nt,
-                  'd_c':d_nc,
-                  'd_i':d_ni,
-                  'd_f':d_nf,
-                  'alpha':alpha,
-                  'D':d,
-                  'b_b':b_b,
-                  'b_w':b_w,
-                  'write_folder':write_folder,
-                  'shift':shifts}
-        local_write(s_list)
+        if n in scc_seeds:
+            d_ni = d_i[n]
+            d_nc = d_c[n]
+            d_nt = d_t[n]
+            d_nf = d_f[n]
+            s_list = {
+                    'sentinel':n,
+                    'seed':seed,
+                    'd_t':d_nt,
+                    'd_c':d_nc,
+                    'd_i':d_ni,
+                    'd_f':d_nf,
+                    'alpha':alpha,
+                    'D':d,
+                    'b_b':b_b,
+                    'b_w':b_w,
+                    'write_folder':write_folder,
+                    'shift':shifts}
+            local_write(s_list)
     return s_list
 
         
@@ -160,7 +162,7 @@ if __name__ == '__main__':
                                             'shift_val':shift_val,
                                             'write_folder':write_folder,
                                             'net_file':net_file
-                                     }
+                                        }
                                     all_params.append(params)
     print("number of possible jobs: ",len(all_params))
     results = []

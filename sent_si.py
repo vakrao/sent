@@ -150,7 +150,7 @@ def update_sent_stats(state, time, D, T, d_t,d_i):
             infected_farms += 1.0
             if n not in d_i:
                 continue
-            if d_t[n] == T :
+            if d_t[n] == 0 :
                 new_t[n] = time
                 new_infec.add(n)
     # go through all newly-infected farms, and update d_i
@@ -276,7 +276,9 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
         day_counter += dt
         new_state= compute_variation (old_state, in_bond,prop_size, b_b, b_w, dt,F,tau)
 
-        d_t,d_i,infected_farms = update_sent_stats(new_state, t, D,T, d_t,d_i)
+        new_dt,new_di,infected_farms = update_sent_stats(new_state, t, D,T, d_t,d_i)
+        d_t = new_dt
+        d_i = new_di
         state = copy.deepcopy(new_state)
         new_state = {}
         if day_counter == curr_month_amount and deltaT < 12:

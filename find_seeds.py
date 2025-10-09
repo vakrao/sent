@@ -164,8 +164,10 @@ def find_real_seeds(fp,seed_amount,in_data,out_data,save_fn):
     id_largest = [x for x in largest]
     
     
+    print("seeds in scc :",len(largest))
     all_ids = [str(index_to_id[i]) for i in id_largest]
     seed_amount_max = len(all_ids)
+    print("seed amount: ",seed_amount_max)
     if seed_amount > seed_amount_max:
         seed_amount = seed_amount_max
     # now, match to region 2
@@ -181,3 +183,63 @@ def find_real_seeds(fp,seed_amount,in_data,out_data,save_fn):
     return seed_ids
     
 
+def seed_in_scc(in_data,out_data):
+    random.seed()
+    id_to_index = {}
+    index_to_id = {}
+    counter = 0
+
+    # go through dictioanries of in, out seeds
+    for n in in_data:
+        id_to_index[n] = counter
+        index_to_id[counter] = n
+        counter += 1
+
+    for n in out_data:
+        if n not in id_to_index:
+            id_to_index[n] = counter
+            index_to_id[counter] = n
+            counter += 1
+
+
+    # convert id values to 0-vertex_amount
+    mod_in_data = {}
+    for d in in_data:
+        x = in_data[d]
+        new_d = id_to_index[d]
+        mod_in_data[new_d] = {}
+        for s in x:
+            new_s = id_to_index[s]
+            mod_in_data[new_d][new_s] = x[s]
+
+    mod_out_data = {}
+    for s in out_data:
+        x = out_data[s]
+        new_s = id_to_index[s]
+        mod_out_data[new_s] = {}
+        for d in x:
+            new_d = id_to_index[d]
+            mod_out_data[new_s][new_d] = x[d]
+    # now, create graph
+    G = nx.DiGraph()
+    for d in mod_in_data:
+        x = mod_in_data[d]
+        for s in x:
+            weight_val = mod_in_data[d][s]
+
+    for s in mod_out_data:
+        x = mod_out_data[s]
+        for d in x:
+            weight_val = mod_out_data[s][d]
+            G.add_edge(s,d,weight=weight_val)
+
+
+    # go through all the strongly connected components of graph
+    comp_amount = 0
+    for _ in nx.strongly_connected_components(G):
+        comp_amount += 1
+    largest = (max(nx.strongly_connected_components(G), key=len))
+    id_largest = [x for x in largest]
+    all_ids = [str(index_to_id[i]) for i in id_largest]
+
+    return all_ids
