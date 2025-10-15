@@ -2,6 +2,84 @@ import networkx as nx
 from sent_si import *
 import random
 import pandas as pd
+
+
+def create_network(in_data,out_data):
+    # go through dictioanries of in, out seeds
+    random.seed()
+    id_to_index = {}
+    index_to_id = {}
+    counter = 0
+    for n in in_data:
+        id_to_index[n] = counter
+        index_to_id[counter] = n
+        counter += 1
+
+    for n in out_data:
+        if n not in id_to_index:
+            id_to_index[n] = counter
+            index_to_id[counter] = n
+            counter += 1
+
+
+    # convert id values to 0-vertex_amount
+    mod_in_data = {}
+    for d in in_data:
+        x = in_data[d]
+        new_d = id_to_index[d]
+        mod_in_data[new_d] = {}
+        for s in x:
+            new_s = id_to_index[s]
+            mod_in_data[new_d][new_s] = x[s]
+
+    mod_out_data = {}
+    for s in out_data:
+        x = out_data[s]
+        new_s = id_to_index[s]
+        mod_out_data[new_s] = {}
+        for d in x:
+            new_d = id_to_index[d]
+            mod_out_data[new_s][new_d] = x[d]
+    # now, create graph
+    G = nx.DiGraph()
+    for d in mod_in_data:
+        x = mod_in_data[d]
+        for s in x:
+            weight_val = mod_in_data[d][s]
+#            G.add_edge(s,d,weight=weight_val))
+    for s in mod_out_data:
+        x = mod_out_data[s]
+        for d in x:
+            weight_val = mod_out_data[s][d]
+            G.add_edge(s,d,weight=weight_val)
+    # go through all the strongly connected components of graph
+    # return the SCC
+
+
+    gc = max(nx.strongly_connected_components(G), key=len)
+    G = nx.DiGraph()
+    for d in mod_in_data:
+        x = {}
+        if d in gc:
+            x = mod_in_data[d]
+        for s in x:
+            if s in gc:
+                weight_val = mod_in_data[d][s]
+            G.add_edge(s,d,weight=weight_val)
+    for s in mod_out_data:
+        x = {}
+        if s in gc:
+            x = mod_out_data[s]
+        for d in x:
+            if d in gc:
+                weight_val = mod_out_data[s][d]
+                G.add_edge(s,d,weight=weight_val)
+    
+
+    return G
+
+
+
 def find_conn_comp_calib_seeds(fp,seed_amount,in_data,out_data,save_fn=""):
     random.seed()
     id_to_index = {}
