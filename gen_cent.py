@@ -6,7 +6,7 @@ from tqdm import tqdm
 from sent_si import *
 #from helpers import *
 from find_seeds import *
-from rank_nodes import *
+from cent_funcs import *
 from decimal import *
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -110,7 +110,7 @@ for i,dt in enumerate(x):
     else:
         large_df = large_df.merge(new_df, how="left")
 
-large_df.to_csv("nz_hort_cent.csv")
+large_df.to_csv("results/nz_hort_cent.csv")
 
 
 ## next, let's rank nodes...
@@ -133,6 +133,8 @@ g_zero = (ranked_data.groupby(["seed"])["real_os"].agg("max"))
 ranked_data["norm_dt"] = ranked_data["d_t"] / 512
 ranked_data["norm_di"] = ranked_data["d_i"] / ranked_data["real_os"]
 ranked_data["norm_df"] = ((ranked_data["d_f"]) / seed_amount)
+
+ranked_data.to_csv("results/ranked_table.csv")
 
 
 

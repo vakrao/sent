@@ -40,12 +40,21 @@ def link_rank_prop_data(rank_df,prop_df):
 
 # use average of r_i and r_t metric to 
 # break the tie
-def break_tie(all_data,rank_val,top_id):
+def break_tie(all_data,rank,top_id):
     best_val = 100000
     single_top = 0
+    if rank == "R_F":
+        rank_A = "R_I"
+        rank_B = "R_T"
+    if rank == "R_I":
+        rank_A = "R_F"
+        rank_B = "R_T"
+    if rank == "R_T":
+        rank_A = "R_I"
+        rank_B = "R_F"
     for t in top_id:
-        ri_val = int(set(all_data[all_data["PROPERTY_ID"] == t]["R_I"]).pop())
-        rt_val = int(set(all_data[all_data["PROPERTY_ID"] == t]["R_T"]).pop())
+        ri_val = int(set(all_data[all_data["PROPERTY_ID"] == t][rank_A]).pop())
+        rt_val = int(set(all_data[all_data["PROPERTY_ID"] == t][rank_B]).pop())
         avg_val = (ri_val + rt_val) / 2
         if avg_val < best_val:
             best_val = avg_val
@@ -53,20 +62,18 @@ def break_tie(all_data,rank_val,top_id):
     return str(single_top)
     
 
-def get_subset(fn,filter_type,all_data,rank):
+def get_subset(fn,filter_type,all_data,rank_type):
 
     in_bond,out_bond = read_network_data(fn)
     if filter_type == "top":
-        top_id = str(list(all_data[all_data[rank] == 1.0]["PROPERTY_ID"])[0])
+        top_id = str(list(all_data[all_data[rank_type] == 1.0]["PROPERTY_ID"])[0])
     else:
-
         rank_val = int(filter_type)
-        #top_id = str(list(all_data[all_data[rank] == rank_val]["PROPERTY_ID"])[0])
-        top_id = (list(all_data[all_data[rank] == rank_val]["PROPERTY_ID"]))
+        top_id = (list(all_data[all_data[rank_type] == filter_type]["PROPERTY_ID"]))
         if len(top_id) == 1:
             top_id = str(top_id[0])
         else:
-            top_id = break_tie(all_data,rank_val,top_id)
+            top_id = break_tie(all_data,rank_type,top_id)
 
     in_neigh = set(in_neighbors(fn,top_id))
     out_neigh = set(out_neighbors(fn,top_id))
@@ -139,21 +146,18 @@ def get_latlong(all_data,node_types):
 
 
 
-def get_top_id(fn,all_data,rank_val,rank):
+def get_top_id(fn,all_data,rank_val,rank_type):
     in_bond,out_bond = read_network_data(fn)
-    if rank_val == 1:
-        top_id = str(list(all_data[all_data[rank] == 1.0]["PROPERTY_ID"])[0])
-    else:
 
-        rank_val = int(rank_val)
-        top_id = (list(all_data[all_data[rank] == rank_val]["PROPERTY_ID"]))
-        if len(top_id) == 1:
-            top_id = str(top_id[0])
-        else:
-            top_id = str(break_tie(all_data,rank_val,top_id))
+    rank_val = int(rank_val)
+    top_id = (list(all_data[all_data[rank_type] == rank_val]["PROPERTY_ID"]))
+    if len(top_id) == 1:
+        top_id = str(top_id[0])
+    else:
+        top_id = str(break_tie(all_data,rank_type,top_id))
     return top_id
 
-def plot_NZ_nodes_arrows(fp,rank_val,subsets_df,neighbors,colors,alpha_vals,node_sizes,node_zorder):
+def plot_NZ_nodes_arrows(fp,rank_type,rank_val,subsets_df,latlong_data,neighbors,colors,alpha_vals,node_sizes,node_zorder):
 
     arrow_types = get_latlong(subsets_df,neighbors)
 
@@ -171,21 +175,51 @@ def plot_NZ_nodes_arrows(fp,rank_val,subsets_df,neighbors,colors,alpha_vals,node
     #node_shapes = ["o" if x != "top_id" else "x" for x in list(subsets_df["node_type"])]
     #node_zorder = [node_zorder[x] for x in list(subsets_df["node_type"])]
     #node_alpha = [alpha_vals[x] for x in list(subsets_df["node_type"])]
-    rank = "R_F"
+    rank = rank_type
     new_fn = "../params/hort365_NZ.csv"
     top_id = int(get_top_id(new_fn,subsets_df,rank_val,rank))
+    print("top-id: ",top_id)
 
-    just_top = subsets_df[subsets_df["PROPERTY_ID"] == top_id]
-    print(just_top)
-    just_both  =subsets_df[subsets_df["node_type"] == "both_neigh"]
-    just_seeds = subsets_df[subsets_df["node_type"] == "seeds"]
-    axs.scatter(just_seeds["lat"],just_seeds["long"],c=colors["seeds"],s=node_sizes["seeds"],alpha=alpha_vals["seeds"],zorder=1,label="Seeds")
-    just_out = subsets_df[subsets_df["node_type"] == "out_neigh"]
-    axs.scatter(just_out["lat"],just_out["long"],c=colors["out_neigh"],s=node_sizes["out_neigh"],alpha=alpha_vals["out_neigh"],zorder=3,label="Out Neighbor")
-    just_in = subsets_df[subsets_df["node_type"] == "in_neigh"]
-    axs.scatter(just_in["lat"],just_in["long"],c=colors["in_neigh"],s=node_sizes["in_neigh"],alpha=alpha_vals["in_neigh"],zorder=3,label="In-Neighbor")
-    axs.scatter(just_top["lat"],just_top["long"],c=colors["top_id"],marker="X",s=node_sizes["top_id"],zorder=4,alpha=alpha_vals["top_id"],label="Top Node")
-    axs.scatter(just_both["lat"],just_both["long"],c=colors["both_neigh"],s=node_sizes["both_neigh"],alpha=alpha_vals["both_neigh"],label="In/Out Neigbor",zorder=3)
+    both_nodes = set(neighbors.get("both_neigh", []))
+    in_nodes = set(neighbors.get("in_neigh", []))
+    out_nodes = set(neighbors.get("out_neigh", []))
+    seed_nodes = set(neighbors.get("seeds", []))
+
+    in_only_nodes = in_nodes.difference(both_nodes)
+    out_only_nodes = out_nodes.difference(both_nodes)
+
+    def select_nodes(node_ids):
+        if not node_ids:
+            return latlong_data.iloc[0:0]
+        subset = latlong_data[latlong_data["PROPERTY_ID"].isin(node_ids)]
+        return subset.drop_duplicates(subset="PROPERTY_ID")
+
+    just_top = select_nodes({top_id})
+    just_both = select_nodes(both_nodes)
+    just_seeds = select_nodes(seed_nodes)
+    just_in = select_nodes(in_only_nodes)
+    just_out = select_nodes(out_only_nodes)
+
+    in_label = f"In-Neigh ({len(in_only_nodes)})"
+    out_label = f"Out-Neigh ({len(out_only_nodes)})"
+    both_label = f"Both-Neigh ({len(both_nodes)})"
+
+    if not just_seeds.empty:
+        axs.scatter(just_seeds["lat"],just_seeds["long"],c=colors["seeds"],s=node_sizes["seeds"],alpha=alpha_vals["seeds"],zorder=1,label="Seeds")
+    if not just_out.empty:
+        axs.scatter(just_out["lat"],just_out["long"],c=colors["out_neigh"],s=node_sizes["out_neigh"],alpha=alpha_vals["out_neigh"],zorder=3,label=out_label)
+    else:
+        axs.scatter([],[],c=colors["out_neigh"],s=node_sizes["out_neigh"],alpha=alpha_vals["out_neigh"],label=out_label)
+    if not just_in.empty:
+        axs.scatter(just_in["lat"],just_in["long"],c=colors["in_neigh"],s=node_sizes["in_neigh"],alpha=alpha_vals["in_neigh"],zorder=3,label=in_label)
+    else:
+        axs.scatter([],[],c=colors["in_neigh"],s=node_sizes["in_neigh"],alpha=alpha_vals["in_neigh"],label=in_label)
+    if not just_top.empty:
+        axs.scatter(just_top["lat"],just_top["long"],c=colors["top_id"],marker="X",s=node_sizes["top_id"],zorder=4,alpha=alpha_vals["top_id"],label="Top Node")
+    if not just_both.empty:
+        axs.scatter(just_both["lat"],just_both["long"],c=colors["both_neigh"],s=node_sizes["both_neigh"],alpha=alpha_vals["both_neigh"],label=both_label,zorder=3)
+    else:
+        axs.scatter([],[],c=colors["both_neigh"],s=node_sizes["both_neigh"],alpha=alpha_vals["both_neigh"],label=both_label)
     axs.legend(loc="upper left",frameon=True)
     axs.set_xlim(lon_bounds)
     axs.set_ylim(lat_bounds)
@@ -198,23 +232,10 @@ def plot_NZ_nodes_arrows(fp,rank_val,subsets_df,neighbors,colors,alpha_vals,node
             #axs.annotate("", xy = (ar[1][0],ar[1][1]), textcoords = "data", xytext=(ar[0][0],ar[0][1]), arrowprops= dict(arrowstyle="-|>",connectionstyle="arc3"),)
             axs.add_patch(arrow)
 
-    axs.legend()
     return 
-
-
     
-
-    
-
-
-
-
-
-
-
-
-
-
-       
-
-    
+def scatter_communities(fp,seeds,comm_colors):
+    nz_regions = gpd.read_file(fp)
+    fig,axs = plt.subplots(figsize=(7,9))
+    nz_regions.plot(ax=axs,color="#fbfbfb", edgecolor="#606060",alpha=0.2,markersize=6,zorder=1)
+    axs.scatter(seeds["lat"],seeds["long"],colormap="rainbow",c=comm_colors,alpha=0.4)
