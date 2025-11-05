@@ -1,0 +1,245 @@
+from tkinter import N
+import networkx as nx
+from shapely import node
+from shapely import Point
+from sent_si import *
+import random
+import geopandas 
+import pandas as pd
+from find_seeds import *
+from cent_funcs import *
+from spatial import *
+
+
+
+
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great-circle distance between two points on the Earth 
+    (specified in decimal degrees) using the Haversine formula.
+
+    Args:
+        lat1 (float): Latitude of the first point in degrees.
+        lon1 (float): Longitude of the first point in degrees.
+        lat2 (float): Latitude of the second point in degrees.
+        lon2 (float): Longitude of the second point in degrees.
+
+    Returns:
+        float: The distance between the two points in kilometers.
+    """
+    R = 6371.0  # Earth radius in kilometers
+
+    # Convert degrees to radians
+    lat1_rad = math.radians(lat1)
+    lon1_rad = math.radians(lon1)
+    lat2_rad = math.radians(lat2)
+    lon2_rad = math.radians(lon2)
+
+    # Difference in coordinates
+    dlon = lon2_rad - lon1_rad
+    dlat = lat2_rad - lat1_rad
+
+    # Haversine formula
+    a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    distance = R * c
+    return distance
+
+
+
+
+def calc_moment(comm_dict,edge_type):
+    first_mom,unique_comms = {},{}
+    node_counter = 0
+    for comm in comm_dict:
+        for node_id in comm_dict[comm]:
+            node_id = str(node_id)
+            node_edges = edge_type.get(node_id, {})
+            node_id = int(node_id)
+            unique_comms[node_id] = 0
+            u = set()
+            for j, i_to_j in node_edges.items():
+                j_comm = id_comm.get(j)
+                if j_comm is None:
+                    continue
+                if j_comm != comm:
+                    u.add(j_comm)
+                    if node_id not in first_mom:
+                        first_mom[node_id] = i_to_j
+                    else:
+                        first_mom[node_id] += i_to_j
+            node_counter += 1
+            unique_comms[node_id] = len(u)
+            if node_id not in first_mom:
+                first_mom[node_id] = 0 
+                unique_comms[node_id] = 0
+
+    return first_mom,unique_comms
+
+
+def calc_distance(comm_dict,edge_type,opt,prop_df):
+    lat = list(prop_df["GPS_CENTRE_LATITUDE"])
+    long = list(prop_df["GPS_CENTRE_LONGITUDE"])
+    prop_id = list(prop_df["PROPERTY_ID"])
+    comm_props = []
+
+    latlong_dict = {}
+    for i,p in enumerate(prop_id):
+        latlong_dict[p] = (lat[i],long[i])
+
+    all_dist = []
+    for c in comm_dict:
+        comm_ids = comm_dict[c]
+        for node_vals in comm_ids:
+            source_node = node_vals
+            if str(node_vals) in edge_type:
+                neighbors = edge_type[str(node_vals)]
+                node_dist= []
+                a_coords = latlong_dict[source_node]
+                for n in neighbors:
+                    b_coords = latlong_dict[int(n)]
+                    dist_val = haversine_distance(a_coords[0],a_coords[1],b_coords[0],b_coords[1])
+                    node_dist.append(dist_val)
+                if opt == "max":
+                    dist_val = max(node_dist)
+                if opt == "avg":
+                    dist_val = np.mean(node_dist)
+            else:
+                dist_val = 0
+            all_dist.append(dist_val)
+            comm_props.append(node_vals)
+
+    dist_df = pd.DataFrame()
+    dist_df['NODE_ID'] = comm_props
+    if opt == "avg":
+        dist_df["AVG_DIST"] = list(all_dist)
+    if opt == "max":
+        dist_df["MAX_DIST"] = list(all_dist)
+
+    return dist_df
+                
+
+
+
+
+
+
+
+
+
+# find first order moment for each node
+# -> average weight of a node leaving its community
+# find second order moment for each node 
+# -> variance of weights of a node leaving its community
+# -> calculate global weights of a node leaving its community
+def moment_stats(in_bond,out_bond,comm_dict,id_comm):
+    out_first_mom,out_second_mom = {},{}
+    unique_comms = {}
+
+    # for each node 
+    # -> comm_id
+    # -> movements out of community
+    #for i in in_bond:
+    #    out_first_mom[i] = 0
+    #    out_second_mom[i] = 0
+    #    unique_comms[i] = 0
+    #for i in out_bond:
+    #    out_first_mom[i] = 0
+    #    out_second_mom[i] = 0
+    #    unique_comms[i] = 0
+
+    out_first_mom,out_unique = calc_moment(comm_dict,out_bond)
+    in_first_mom,in_unique = calc_moment(comm_dict,in_bond)
+
+
+    ### now, lets calculate the second moment
+    #for comm in comm_dict:
+    #    for node_id in comm_dict[comm]:
+    #        node_id = str(node_id)
+    #        if node_id not in out_second_mom:
+    #            out_second_mom[node_id] = 0
+
+    comm_df = pd.DataFrame()
+    comm_df['NODE_ID'] = list(out_first_mom.keys())
+    comm_df['FIRST_OUT_MOMENT'] = list(out_first_mom.values())
+    comm_df['FIRST_IN_MOMENT'] = list(in_first_mom.values())
+    comm_df["UNIQUE_OUT_COMMS"] = list(out_unique.values())
+    comm_df["UNIQUE_IN_COMMS"] = list(out_unique.values())
+
+    return comm_df
+
+net_fn = "params/hort365_NZ.csv"
+prop_fn = "params/2024_prop_dat.csv"
+
+## get in, out values
+
+in_bond, out_bond = read_network_data(net_fn)
+prop_size = read_property_data(prop_fn)
+
+
+
+
+
+count_to_id = {}
+counter = 0
+for i in in_bond:
+    count_to_id[counter] = i 
+    counter += 1
+last_vals = count_to_id.values()
+for i in out_bond:
+    if i not in list(last_vals):
+        count_to_id[counter] = i 
+        counter += 1
+
+G = create_network(in_bond, out_bond)
+
+louv_comms = nx.community.louvain_communities(G,weight="weight",seed=123)
+
+
+
+large_df = pd.DataFrame()
+comm_ids = []
+id_vals = []
+comm_counter = 1
+comm_dict = {}
+id_comm = {}
+# iterater through all communities
+# convert graph ID to property ID
+node_count = 0
+for comm in (louv_comms):
+
+    local_ids = []
+    for i in comm:
+        correct_id = int(count_to_id[i])
+        id_comm[str(correct_id)] = comm_counter
+        comm_ids.append(comm_counter)
+        id_vals.append(correct_id)
+        local_ids.append(correct_id)
+        node_count += 1
+    comm_dict[comm_counter] = local_ids
+    comm_counter += 1 
+
+comm_data = {"PROPERTY_ID":id_vals,"COMM_ID":comm_ids}
+comm_df = pd.DataFrame(data=comm_data)
+
+
+prop_data = pd.read_csv(prop_fn)
+
+comm_df = comm_df.merge(prop_data)
+
+comm_df.to_csv("results/louvain_data.csv")
+
+fp = "params/regional-council-2025-clipped.shp"
+comm_colors = comm_ids 
+
+
+#scatter_communities(fp,seeds,comm_colors)
+moment_df = moment_stats(in_bond,out_bond,comm_dict,id_comm)
+dist_df =calc_distance(comm_dict,in_bond,"max",prop_data) 
+moment_df = moment_df.merge(dist_df)
+
+moment_df.to_csv("results/moments.csv")
+
+
