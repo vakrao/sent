@@ -18,10 +18,6 @@ prop_fn = "params/2024_prop_dat.csv"
 in_bond, out_bond = read_network_data(net_fn)
 prop_size = read_property_data(prop_fn)
 
-
-
-
-
 count_to_id = {}
 counter = 0
 for i in in_bond:
@@ -29,7 +25,7 @@ for i in in_bond:
     counter += 1
 for i in out_bond:
     if i not in list(count_to_id.values()):
-        count_to_id[counter] = i 
+        count_to_id[counter] = i
         counter += 1
 
 G = create_network(in_bond, out_bond)
@@ -46,8 +42,11 @@ w,i_d,o_d,i_w,o_w,d,h = {},{},{},{},{},{},{}
 ## based on SCC
 
 di_nodes = G.nodes
+all_ids = []
 
 for n in di_nodes:
+    convt_id = count_to_id[int(n)]
+    all_ids.append(convt_id)
     in_deg= G.in_degree(n)
     out_deg= G.out_degree(n)
     all_in_w= G.in_edges(n,data=True)
@@ -63,13 +62,20 @@ for n in di_nodes:
     
     ## assign to dictionaries
 
-    i_d[n] = in_deg
-    i_w[n] = in_w
-    o_d[n] = out_deg
-    o_w[n] = out_w
-    w[n] = in_w + out_w
-    d[n] = in_deg+out_deg
-    h[n] = prop_size[count_to_id[n]]
+    i_d[convt_id] = in_deg
+    i_w[convt_id] = in_w
+    o_d[convt_id] = out_deg
+    o_w[convt_id] = out_w
+    w[convt_id] = in_w + out_w
+    d[convt_id] = in_deg+out_deg
+    h[convt_id] = prop_size[convt_id]
+    if convt_id == "31568":
+        print("in-bond degree:",in_bond[convt_id])
+        print("in-degree: ",i_d[convt_id])
+        print("in-weight: ",i_w[convt_id])
+        print("out-degree: ",o_d[convt_id])
+        print("out-weight: ",o_w[convt_id])
+        print("total w: ",w[convt_id])
 
 ## get network centrality measures
 close = ret_closeness(G)
@@ -80,36 +86,37 @@ clust = nx.clustering(G)
 
 ## need component size
 x = {
-    'h':h,
-    'i_d':i_d,
-    'o_d':o_d,
-    'o_w':o_w,
-    'i_w':i_w,
-    'w':w,
-    'd':d,
-    'close':close,
-    'bc':bc,
-    'ev':ev,
-    'harm':harm,
-    'clust':clust}
-#     'katz':katz}
+    'node_id':all_ids,
+    'h':h.values(),
+    'i_d':i_d.values(),
+    'o_d':o_d.values(),
+    'o_w':o_w.values(),
+    'i_w':i_w.values(),
+    'w':w.values(),
+    'd':d.values(),
+    'close':close.values(),
+    'bc':bc.values(),
+    'ev':ev.values(),
+    'harm':harm.values(),
+    'clust':clust.values()}
 
 ## okay, now lets save the degree values
 
-large_df = pd.DataFrame()
+large_df = pd.DataFrame.from_dict(x)
+"""
 for i,dt in enumerate(x):
     new_df = pd.DataFrame()
     deg_type = x[dt]
     node_ids = list(deg_type.keys())
-    correct_ids = [count_to_id[i] for i in node_ids]
+    correct_ids = [k for k in node_ids]
     all_vals = list(deg_type.values())
     new_df["node_id"] = correct_ids
     new_df[dt] = all_vals
     if i == 0:
         large_df = new_df
     else:
-        large_df = large_df.merge(new_df, how="left")
-
+        large_df = large_df.join(new_df)
+"""
 large_df.to_csv("results/nz_hort_cent.csv")
 
 
@@ -135,6 +142,8 @@ ranked_data["norm_di"] = ranked_data["d_i"] / ranked_data["real_os"]
 ranked_data["norm_df"] = ((ranked_data["d_f"]) / seed_amount)
 
 ranked_data.to_csv("results/ranked_table.csv")
+
+
 
 
 

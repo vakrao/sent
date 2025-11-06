@@ -50,21 +50,25 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 
 
-def calc_moment(comm_dict,edge_type):
+def calc_moment(comm_dict,edge_dict):
     first_mom,unique_comms = {},{}
     node_counter = 0
-    for comm in comm_dict:
-        for node_id in comm_dict[comm]:
+    for node_comm in comm_dict:
+        for node_id in comm_dict[node_comm]:
             node_id = str(node_id)
-            node_edges = edge_type.get(node_id, {})
+            node_edges = edge_dict.get(node_id, {})
             node_id = int(node_id)
             unique_comms[node_id] = 0
             u = set()
             for j, i_to_j in node_edges.items():
                 j_comm = id_comm.get(j)
+                if str(node_id) == "31568":
+                    print("NODE ID: ",node_id)
+                    print(j)
+                    print(edge_dict[str(node_id)])
                 if j_comm is None:
                     continue
-                if j_comm != comm:
+                if j_comm != node_comm:
                     u.add(j_comm)
                     if node_id not in first_mom:
                         first_mom[node_id] = i_to_j
@@ -119,6 +123,8 @@ def calc_distance(comm_dict,edge_type,opt,prop_df):
         dist_df["MAX_DIST"] = list(all_dist)
 
     return dist_df
+
+
                 
 
 
@@ -134,41 +140,31 @@ def calc_distance(comm_dict,edge_type,opt,prop_df):
 # find second order moment for each node 
 # -> variance of weights of a node leaving its community
 # -> calculate global weights of a node leaving its community
-def moment_stats(in_bond,out_bond,comm_dict,id_comm):
+def moment_stats(in_bond,out_bond,comm_dict):
     out_first_mom,out_second_mom = {},{}
     unique_comms = {}
 
-    # for each node 
-    # -> comm_id
-    # -> movements out of community
-    #for i in in_bond:
-    #    out_first_mom[i] = 0
-    #    out_second_mom[i] = 0
-    #    unique_comms[i] = 0
-    #for i in out_bond:
-    #    out_first_mom[i] = 0
-    #    out_second_mom[i] = 0
-    #    unique_comms[i] = 0
 
+    print("out")
     out_first_mom,out_unique = calc_moment(comm_dict,out_bond)
+    print(" out first moment: ",out_first_mom[31568])
+    print("31568")
     in_first_mom,in_unique = calc_moment(comm_dict,in_bond)
+    print("first in moment: ",in_first_mom[31568])
 
 
-    ### now, lets calculate the second moment
-    #for comm in comm_dict:
-    #    for node_id in comm_dict[comm]:
-    #        node_id = str(node_id)
-    #        if node_id not in out_second_mom:
-    #            out_second_mom[node_id] = 0
+    all_nodes = []
+    for c in comm_dict:
+        for i in comm_dict[c]:
+            all_nodes.append(i)
+    temp_mom = pd.DataFrame()
+    temp_mom['NODE_ID'] = list(all_nodes)
+    temp_mom['FIRST_OUT_MOMENT'] = list(out_first_mom.values())
+    temp_mom['FIRST_IN_MOMENT'] = list(in_first_mom.values())
+    temp_mom["UNIQUE_OUT_COMMS"] = list(out_unique.values())
+    temp_mom["UNIQUE_IN_COMMS"] = list(out_unique.values())
 
-    comm_df = pd.DataFrame()
-    comm_df['NODE_ID'] = list(out_first_mom.keys())
-    comm_df['FIRST_OUT_MOMENT'] = list(out_first_mom.values())
-    comm_df['FIRST_IN_MOMENT'] = list(in_first_mom.values())
-    comm_df["UNIQUE_OUT_COMMS"] = list(out_unique.values())
-    comm_df["UNIQUE_IN_COMMS"] = list(out_unique.values())
-
-    return comm_df
+    return temp_mom
 
 net_fn = "params/hort365_NZ.csv"
 prop_fn = "params/2024_prop_dat.csv"
@@ -236,10 +232,13 @@ comm_colors = comm_ids
 
 
 #scatter_communities(fp,seeds,comm_colors)
-moment_df = moment_stats(in_bond,out_bond,comm_dict,id_comm)
-dist_df =calc_distance(comm_dict,in_bond,"max",prop_data) 
-moment_df = moment_df.merge(dist_df)
-
+moment_df = moment_stats(in_bond,out_bond,comm_dict)
 moment_df.to_csv("results/moments.csv")
+dist_df =calc_distance(comm_dict,in_bond,"max",prop_data) 
+cent_df = pd.read_csv("results/nz_hort_cent.csv")
+moment_df = moment_df.merge(dist_df)
+cent_df = cent_df.rename(columns={"node_id":"NODE_ID"})
+moment_df = moment_df.merge(cent_df)
+moment_df.to_csv("results/all_stats.csv")
 
 

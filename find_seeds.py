@@ -56,6 +56,7 @@ def create_network(in_data,out_data):
     # return the SCC
 
 
+    """
     gc = max(nx.strongly_connected_components(G), key=len)
     G = nx.DiGraph()
     for d in mod_in_data:
@@ -74,6 +75,7 @@ def create_network(in_data,out_data):
             if d in gc:
                 weight_val = mod_out_data[s][d]
                 G.add_edge(s,d,weight=weight_val)
+    """
     
 
     return G
