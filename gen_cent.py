@@ -28,7 +28,7 @@ for i in out_bond:
         count_to_id[counter] = i
         counter += 1
 
-G = create_network(in_bond, out_bond)
+G,_,_ = create_network(in_bond, out_bond)
 
 
 
@@ -141,7 +141,20 @@ ranked_data["norm_dt"] = ranked_data["d_t"] / 512
 ranked_data["norm_di"] = ranked_data["d_i"] / ranked_data["real_os"]
 ranked_data["norm_df"] = ((ranked_data["d_f"]) / seed_amount)
 
-ranked_data.to_csv("results/ranked_table.csv")
+# now, we rank
+agg = ranked_data.groupby("sent", as_index=True).agg(
+    dF_sum=("norm_df", "sum"),     # total detections (higher better)
+    dI_mean=("norm_di", "mean"),   # mean infections at detection (lower better)
+    dT_mean=("norm_dt", "mean"),   # mean time to detection (lower better)
+)
+agg["dF_sum"] = 1- agg["dF_sum"]
+# ----------------------------------------------------
+# Compute ranks (1 = best)
+# ----------------------------------------------------
+agg["R_F"] = agg["dF_sum"].rank(ascending=True, method="min")
+agg["R_I"] = agg["dI_mean"].rank(ascending=True,  method="min")
+agg["R_T"] = agg["dT_mean"].rank(ascending=True,  method="min")
+agg.to_csv("results/ranked_table.csv")
 
 
 

@@ -62,10 +62,6 @@ def calc_moment(comm_dict,edge_dict):
             u = set()
             for j, i_to_j in node_edges.items():
                 j_comm = id_comm.get(j)
-                if str(node_id) == "31568":
-                    print("NODE ID: ",node_id)
-                    print(j)
-                    print(edge_dict[str(node_id)])
                 if j_comm is None:
                     continue
                 if j_comm != node_comm:
@@ -82,8 +78,35 @@ def calc_moment(comm_dict,edge_dict):
 
     return first_mom,unique_comms
 
+def calc_deg_moment(comm_dict,edge_dict):
+    first_mom,unique_comms = {},{}
+    node_counter = 0
+    for node_comm in comm_dict:
+        for node_id in comm_dict[node_comm]:
+            node_id = str(node_id)
+            node_edges = edge_dict.get(node_id, {})
+            node_id = int(node_id)
+            unique_comms[node_id] = 0
+            u = set()
+            for j, i_to_j in node_edges.items():
+                j_comm = id_comm.get(j)
+                if j_comm is None:
+                    continue
+                if j_comm != node_comm:
+                    u.add(j_comm)
+                    if node_id not in first_mom:
+                        first_mom[node_id] = 1
+                    else:
+                        first_mom[node_id] += 1
+            node_counter += 1
+            unique_comms[node_id] = len(u)
+            if node_id not in first_mom:
+                first_mom[node_id] = 0 
+                unique_comms[node_id] = 0
 
-def calc_distance(comm_dict,edge_type,opt,prop_df):
+    return first_mom,unique_comms
+
+def calc_distance(comm_dict,edge_type,opt,prop_df,in_out):
     lat = list(prop_df["GPS_CENTRE_LATITUDE"])
     long = list(prop_df["GPS_CENTRE_LONGITUDE"])
     prop_id = list(prop_df["PROPERTY_ID"])
@@ -106,21 +129,20 @@ def calc_distance(comm_dict,edge_type,opt,prop_df):
                     b_coords = latlong_dict[int(n)]
                     dist_val = haversine_distance(a_coords[0],a_coords[1],b_coords[0],b_coords[1])
                     node_dist.append(dist_val)
-                if opt == "max":
-                    dist_val = max(node_dist)
-                if opt == "avg":
-                    dist_val = np.mean(node_dist)
-            else:
-                dist_val = 0
+            if opt == "MAX":
+                dist_val = max(node_dist)
+            if opt == "AVG":
+                dist_val = np.mean(node_dist)
             all_dist.append(dist_val)
             comm_props.append(node_vals)
 
     dist_df = pd.DataFrame()
     dist_df['NODE_ID'] = comm_props
-    if opt == "avg":
-        dist_df["AVG_DIST"] = list(all_dist)
-    if opt == "max":
-        dist_df["MAX_DIST"] = list(all_dist)
+    title_string = opt+"_DIST_"+in_out
+    if opt == "AVG":
+        dist_df[title_string] = list(all_dist)
+    if opt == "MAX":
+        dist_df[title_string] = list(all_dist)
 
     return dist_df
 
@@ -145,12 +167,8 @@ def moment_stats(in_bond,out_bond,comm_dict):
     unique_comms = {}
 
 
-    print("out")
     out_first_mom,out_unique = calc_moment(comm_dict,out_bond)
-    print(" out first moment: ",out_first_mom[31568])
-    print("31568")
     in_first_mom,in_unique = calc_moment(comm_dict,in_bond)
-    print("first in moment: ",in_first_mom[31568])
 
 
     all_nodes = []
@@ -162,10 +180,36 @@ def moment_stats(in_bond,out_bond,comm_dict):
     temp_mom['FIRST_OUT_MOMENT'] = list(out_first_mom.values())
     temp_mom['FIRST_IN_MOMENT'] = list(in_first_mom.values())
     temp_mom["UNIQUE_OUT_COMMS"] = list(out_unique.values())
-    temp_mom["UNIQUE_IN_COMMS"] = list(out_unique.values())
+    temp_mom["UNIQUE_IN_COMMS"] = list(in_unique.values())
 
     return temp_mom
 
+# find first order moment for each node
+# -> average weight of a node leaving its community
+# find second order moment for each node 
+# -> variance of weights of a node leaving its community
+# -> calculate global weights of a node leaving its community
+def deg_stats(in_bond,out_bond,comm_dict):
+    out_first_mom,out_second_mom = {},{}
+    unique_comms = {}
+
+
+    out_first_deg,out_unique = calc_deg_moment(comm_dict,out_bond)
+    in_first_deg,in_unique = calc_deg_moment(comm_dict,in_bond)
+
+
+    all_nodes = []
+    for c in comm_dict:
+        for i in comm_dict[c]:
+            all_nodes.append(i)
+    temp_deg = pd.DataFrame()
+    temp_deg['NODE_ID'] = list(all_nodes)
+    temp_deg['FIRST_OUT_DEG_MOMENT'] = list(out_first_deg.values())
+    temp_deg['FIRST_IN_DEG_MOMENT'] = list(in_first_deg.values())
+    temp_deg["UNIQUE_OUT_DEG_COMMS"] = list(out_unique.values())
+    temp_deg["UNIQUE_IN_DEG_COMMS"] = list(in_unique.values())
+
+    return temp_deg
 net_fn = "params/hort365_NZ.csv"
 prop_fn = "params/2024_prop_dat.csv"
 
@@ -189,7 +233,7 @@ for i in out_bond:
         count_to_id[counter] = i 
         counter += 1
 
-G = create_network(in_bond, out_bond)
+G,_,_ = create_network(in_bond, out_bond)
 
 louv_comms = nx.community.louvain_communities(G,weight="weight",seed=123)
 
@@ -234,11 +278,24 @@ comm_colors = comm_ids
 #scatter_communities(fp,seeds,comm_colors)
 moment_df = moment_stats(in_bond,out_bond,comm_dict)
 moment_df.to_csv("results/moments.csv")
-dist_df =calc_distance(comm_dict,in_bond,"max",prop_data) 
+degmom_df = deg_stats(in_bond,out_bond,comm_dict)
+degmom_df.to_csv("results/deg_moments.csv")
+moment_df = moment_df.merge(degmom_df)
+in_max_dist_df =calc_distance(comm_dict,in_bond,"MAX",prop_data,"IN") 
+in_avg_dist_df =calc_distance(comm_dict,in_bond,"AVG",prop_data,"IN") 
+out_max_dist_df =calc_distance(comm_dict,out_bond,"MAX",prop_data,"OUT") 
+out_avg_dist_df =calc_distance(comm_dict,out_bond,"AVG",prop_data,"OUT") 
+
 cent_df = pd.read_csv("results/nz_hort_cent.csv")
-moment_df = moment_df.merge(dist_df)
+moment_df = moment_df.merge(in_max_dist_df)
+moment_df = moment_df.merge(in_avg_dist_df)
+moment_df = moment_df.merge(out_avg_dist_df)
+moment_df = moment_df.merge(out_max_dist_df)
 cent_df = cent_df.rename(columns={"node_id":"NODE_ID"})
 moment_df = moment_df.merge(cent_df)
+rank_df = pd.read_csv("results/ranked_table.csv")
+rank_df = rank_df.rename(columns={'sent':"NODE_ID"})
+moment_df = moment_df.merge(rank_df)
 moment_df.to_csv("results/all_stats.csv")
 
 

@@ -56,29 +56,36 @@ def create_network(in_data,out_data):
     # return the SCC
 
 
-    """
     gc = max(nx.strongly_connected_components(G), key=len)
     G = nx.DiGraph()
+    real_in_b,real_out_b = {},{}
     for d in mod_in_data:
         x = {}
+        new_d = index_to_id[d]
         if d in gc:
             x = mod_in_data[d]
+        real_in_b[new_d] = {}
         for s in x:
+            new_s = index_to_id[s]
             if s in gc:
                 weight_val = mod_in_data[d][s]
-            G.add_edge(s,d,weight=weight_val)
+                G.add_edge(s,d,weight=weight_val)
+                real_in_b[new_d][new_s] = weight_val
     for s in mod_out_data:
         x = {}
+        new_s = index_to_id[s]
         if s in gc:
             x = mod_out_data[s]
+        real_out_b[new_s] = {}
         for d in x:
+            new_d = index_to_id[d]
             if d in gc:
                 weight_val = mod_out_data[s][d]
                 G.add_edge(s,d,weight=weight_val)
-    """
+                real_out_b[new_s][new_d] = weight_val
     
 
-    return G
+    return G,real_in_b,real_out_b
 
 
 

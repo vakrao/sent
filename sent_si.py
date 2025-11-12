@@ -4,6 +4,7 @@ import random
 import copy
 import numpy as np
 from decimal import Decimal
+from find_seeds import *
 import math
 
 
@@ -37,7 +38,12 @@ def read_network_data (filename):
                 out_bond[s][d] += float(w)
                 ##
             first_row = 1
-    return in_bond, out_bond
+    # now, let's pass in in_bond
+    # and out_bond to prune G
+    _,real_in_bond,real_out_bond = create_network(in_bond,out_bond)
+
+
+    return real_in_bond,real_out_bond
 
 #####
 def read_property_data (filename):
