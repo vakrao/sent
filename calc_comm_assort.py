@@ -27,6 +27,7 @@ def comm_density(node_comm_dict,in_bond,out_bond):
 
 
     N_comms,w = {},{}
+    print(len(set(node_comm_dict.keys())))
     for i in node_comm_dict:
         c = node_comm_dict[i]
         if c not in N_comms:
@@ -56,25 +57,29 @@ def comm_density(node_comm_dict,in_bond,out_bond):
                 w[(r,s)] += x
 
 
-    class_types = []
+    class_types = {}
     combos = set()
-    for r in N_comms:
-        for s in N_comms:
+    print(set(N_comms.keys()))
+    comm_ids = set(N_comms.keys())
+    for r in comm_ids:
+        for s in comm_ids:
             if (r,s) not in combos:
-            if max(w[(r,s)],w[(s,r)]) < min(w[(r,r)],w[(s,s)]):
-                class_types.append("Assortative")
-            if max(w[(r,r)],w[(r,s)]) > max(w[(s,r)],w[(s,s)]):
-                class_types.append("Core-periphery")
-            if min(w[(r,s)],w[(s,r)]) > max(w[(r,r)],w[(s,s)]):
-                class_types.append("Disassortative")
-            if min(w[(r,r)],w[(s,r)]) > max(w[(r,s)],w[(s,s)]):
-                class_types.append("Source-basin")
+                if max(w[(r,s)],w[(s,r)]) < min(w[(r,r)],w[(s,s)]):
+                    class_types[(r,s)] = "Assortative"
+                if max(w[(r,r)],w[(r,s)]) > max(w[(s,r)],w[(s,s)]):
+                    class_types[(r,s)] = "Core-Periphery"
+                if min(w[(r,s)],w[(s,r)]) > max(w[(r,r)],w[(s,s)]):
+                    class_types[(r,s)] = "Disassortative"
+                if min(w[(r,r)],w[(s,r)]) > max(w[(r,s)],w[(s,s)]):
+                    class_types[(r,s)] = "Source-Basin"
+    class_types = list(class_types.values())
 
     return class_types
 
 
 network_stats = "params/hort365_NZ.csv"
 all_stats = pd.read_csv("results/louvain_data.csv")
+print("num comms: ",len(set(all_stats["COMM_ID"])))
 comm_ids = comm_dict(all_stats)
 in_bond,out_bond = read_network_data(network_stats)
 class_types = comm_density(comm_ids,in_bond,out_bond)

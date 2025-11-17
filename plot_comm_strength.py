@@ -29,10 +29,10 @@ all_data = all_data.drop(columns=["PROPERTY_ID"])
 
 net_fn = "params/hort365_NZ.csv"
 in_bond, out_bond = read_network_data(net_fn)
-all_data["s_within_in"] = (all_data["i_w"] - all_data["FIRST_IN_MOMENT"])/(all_data["w"])
-all_data["s_within_out"] = (all_data["o_w"] - all_data["FIRST_OUT_MOMENT"])/(all_data["w"])
-all_data["s_between_in"] = (all_data["FIRST_IN_MOMENT"])/(all_data["w"])
-all_data["s_between_out"] = (all_data["FIRST_OUT_MOMENT"])/(all_data["w"])
+all_data["s_within_in"] = (all_data["i_w"] - all_data["FIRST_IN_MOMENT"])/(all_data["i_w"])
+all_data["s_within_out"] = (all_data["o_w"] - all_data["FIRST_OUT_MOMENT"])/(all_data["o_w"])
+all_data["s_between_in"] = (all_data["FIRST_IN_MOMENT"])/(all_data["i_w"])
+all_data["s_between_out"] = (all_data["FIRST_OUT_MOMENT"])/(all_data["o_w"])
 all_data["s_between"] = all_data["s_between_in"] + all_data["s_between_out"]
 all_data["s_within"] = all_data["s_within_in"] + all_data["s_within_out"]
 all_data["d_within_in"] = (all_data["i_d"] - all_data["FIRST_IN_DEG_MOMENT"])/(all_data["d"])
