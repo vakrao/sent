@@ -2,6 +2,7 @@ import pandas as pd
 import multiprocessing as mp
 import sys
 import yaml
+import os
 from tqdm import tqdm
 from sent_si import *
 #from helpers import *
@@ -10,153 +11,167 @@ from cent_funcs import *
 from decimal import *
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-net_fn = "params/hort365_NZ.csv"
-prop_fn = "params/2024_prop_dat.csv"
-
-## get in, out values
-
-in_bond, out_bond = read_network_data(net_fn)
-prop_size = read_property_data(prop_fn)
-
-count_to_id = {}
-counter = 0
-for i in in_bond:
-    count_to_id[counter] = i 
-    counter += 1
-for i in out_bond:
-    if i not in list(count_to_id.values()):
-        count_to_id[counter] = i
-        counter += 1
-
-G,_,_ = create_network(in_bond, out_bond)
 
 
-
-## let us save all the relevant degree
-## information
-
-w,i_d,o_d,i_w,o_w,d,h = {},{},{},{},{},{},{}
-
-
-## need to do prune in_bond,out_bond
-## based on SCC
-
-di_nodes = G.nodes
-all_ids = []
-
-for n in di_nodes:
-    convt_id = count_to_id[int(n)]
-    all_ids.append(convt_id)
-    in_deg= G.in_degree(n)
-    out_deg= G.out_degree(n)
-    all_in_w= G.in_edges(n,data=True)
-    all_out_w= G.out_edges(n,data=True)
-    
-    in_w = 0
-    out_w = 0
-
-    for a in all_in_w:
-        in_w = in_w + a[2]["weight"]
-    for a in all_out_w:
-        out_w = out_w + a[2]["weight"]
-    
-    ## assign to dictionaries
-
-    i_d[convt_id] = in_deg
-    i_w[convt_id] = in_w
-    o_d[convt_id] = out_deg
-    o_w[convt_id] = out_w
-    w[convt_id] = in_w + out_w
-    d[convt_id] = in_deg+out_deg
-    h[convt_id] = prop_size[convt_id]
-    if convt_id == "31568":
-        print("in-bond degree:",in_bond[convt_id])
-        print("in-degree: ",i_d[convt_id])
-        print("in-weight: ",i_w[convt_id])
-        print("out-degree: ",o_d[convt_id])
-        print("out-weight: ",o_w[convt_id])
-        print("total w: ",w[convt_id])
-
-## get network centrality measures
-close = ret_closeness(G)
-bc = ret_bc(G)
-ev = ret_ev(G,1000)
-harm = ret_harmonic(G)
-clust = nx.clustering(G)
-
-## need component size
-x = {
-    'node_id':all_ids,
-    'h':h.values(),
-    'i_d':i_d.values(),
-    'o_d':o_d.values(),
-    'o_w':o_w.values(),
-    'i_w':i_w.values(),
-    'w':w.values(),
-    'd':d.values(),
-    'close':close.values(),
-    'bc':bc.values(),
-    'ev':ev.values(),
-    'harm':harm.values(),
-    'clust':clust.values()}
-
-## okay, now lets save the degree values
-
-large_df = pd.DataFrame.from_dict(x)
 """
-for i,dt in enumerate(x):
-    new_df = pd.DataFrame()
-    deg_type = x[dt]
-    node_ids = list(deg_type.keys())
-    correct_ids = [k for k in node_ids]
-    all_vals = list(deg_type.values())
-    new_df["node_id"] = correct_ids
-    new_df[dt] = all_vals
-    if i == 0:
-        large_df = new_df
-    else:
-        large_df = large_df.join(new_df)
+inputs:
+    season_var: season directory to read from
+    prop_data: file-name for property-data 
+outputs:
+    pandas dataframe of all centrlaity data 
 """
-large_df.to_csv("results/nz_hort_cent.csv")
+def find_node_stats(season_var,prop_fn):
+    num_networks =  0
+    net_type = "year"
+    if season_var == "s":
+        net_type = "season"
+    if season_var == "m":
+        net_type = "month"
+    param_directory = "params/new_"+net_type+"_tau/"
+    contents = os.listdir(param_directory)
 
 
-## next, let's rank nodes...
-ranked_data = pd.read_csv("data/data_y_real.csv")
-ranked_data['o_s'] = ranked_data['d_c'] + ranked_data['d_i']
-outbreak_sizes = ranked_data.groupby(["seed"])["o_s"].agg("max")
-new_df = pd.DataFrame()
-new_df["seed"] = outbreak_sizes.index
-# Get Full Outbreak Size
-new_df["real_os"] = list(outbreak_sizes)
-ranked_data = ranked_data.merge(new_df,left_on="seed",right_on="seed")
-ranked_data = ranked_data[ranked_data["o_s"] > 0]
-out_sizes = [ x for x in list(outbreak_sizes)  if x > 0 ]
-# Count Number of times 
-just_zero = ranked_data[ranked_data['o_s'] == 0].groupby(['seed']).size().rename('n_outbreaks')
-zero_ids = list(just_zero.index)
-seed_amount = len(set(ranked_data["seed"]))
-## if an outbreak occurs - what is probability of detecting it for a given sentinel? 
-g_zero = (ranked_data.groupby(["seed"])["real_os"].agg("max"))
-ranked_data["norm_dt"] = ranked_data["d_t"] / 512
-ranked_data["norm_di"] = ranked_data["d_i"] / ranked_data["real_os"]
-ranked_data["norm_df"] = ((ranked_data["d_f"]) / seed_amount)
+    
+    for net_fn in contents:
+        ## get in, out values
+    
 
-# now, we rank
-agg = ranked_data.groupby("sent", as_index=True).agg(
-    dF_sum=("norm_df", "sum"),     # total detections (higher better)
-    dI_mean=("norm_di", "mean"),   # mean infections at detection (lower better)
-    dT_mean=("norm_dt", "mean"),   # mean time to detection (lower better)
-)
-agg["dF_sum"] = 1- agg["dF_sum"]
-# ----------------------------------------------------
-# Compute ranks (1 = best)
-# ----------------------------------------------------
-agg["R_F"] = agg["dF_sum"].rank(ascending=True, method="min")
-agg["R_I"] = agg["dI_mean"].rank(ascending=True,  method="min")
-agg["R_T"] = agg["dT_mean"].rank(ascending=True,  method="min")
-agg.to_csv("results/ranked_table.csv")
+        num_networks += 1
+        net_path = param_directory+net_fn
+        in_bond, out_bond = read_network_data(net_path)
+        prop_size = read_property_data(prop_fn)
+        
+        count_to_id = {}
+        counter = 0
+        for i in in_bond:
+            count_to_id[counter] = i 
+            counter += 1
+        for i in out_bond:
+            if i not in list(count_to_id.values()):
+                count_to_id[counter] = i
+                counter += 1
+        
+        G,_,_ = create_network(in_bond, out_bond)
+        
+        
+        
+        ## let us save all the relevant degree
+        ## information
+        
+        w,i_d,o_d,i_w,o_w,d,h = {},{},{},{},{},{},{}
+        
+        
+        ## need to do prune in_bond,out_bond
+        ## based on SCC
+        
+        di_nodes = G.nodes
+        all_ids = []
+        
+        for n in di_nodes:
+            convt_id = count_to_id[int(n)]
+            all_ids.append(convt_id)
+            in_deg= G.in_degree(n)
+            out_deg= G.out_degree(n)
+            all_in_w= G.in_edges(n,data=True)
+            all_out_w= G.out_edges(n,data=True)
+            
+            in_w = 0
+            out_w = 0
+        
+            for a in all_in_w:
+                in_w = in_w + a[2]["weight"]
+            for a in all_out_w:
+                out_w = out_w + a[2]["weight"]
+            
+            ## assign to dictionaries
+        
+            if convt_id not in i_d:
+                i_d[convt_id] = in_deg
+                i_w[convt_id] = in_w
+                o_d[convt_id] = out_deg
+                o_w[convt_id] = out_w
+                w[convt_id] = in_w + out_w
+                d[convt_id] = in_deg+out_deg
+                h[convt_id] = prop_size[convt_id]
+        
+            else:
+                i_d[convt_id] += in_deg
+                i_w[convt_id] += in_w
+                o_d[convt_id] += out_deg
+                o_w[convt_id] += out_w
+                w[convt_id] += in_w + out_w
+                d[convt_id] += in_deg+out_deg
+    
+        ## get network centrality measures
+        all_close,all_bc,all_ev,all_harm,all_clust = {},{},{},{},{}
+        close = ret_closeness(G)
+        bc = ret_bc(G)
+        ev = ret_ev(G,1000)
+        harm = ret_harmonic(G)
+        clust = nx.clustering(G)
+        for x in close:
+    
+            if x in all_close:
+                all_close[x] += close[x]
+                all_bc[x] += bc[x]
+                all_harm[x] += harm[x]
+                all_clust[x] += clust[x]
+                all_ev[x] += ev[x]
+    
+            else:
+                all_close[x] = close[x]
+                all_bc[x] = bc[x]
+                all_harm[x] = harm[x]
+                all_clust[x] = clust[x]
+                all_ev[x] = ev[x]
+    
+    all_dicts = [i_d,i_w,o_d,o_w,w,d,all_close,all_bc,all_harm,all_ev]
+    for a in all_dicts:
+        for node_id in a:
+            a[node_id] = a[node_id] / num_networks
+    
+    
+    
+    ## need component size
+    x = {
+         'node_id':all_ids,
+         'h':h.values(),
+         'i_d':i_d.values(),
+         'o_d':o_d.values(),
+         'o_w':o_w.values(),
+         'i_w':i_w.values(),
+         'w':w.values(),
+         'd':d.values(),
+         'close':all_close.values(),
+         'bc':all_bc.values(),
+         'ev':all_ev.values(),
+         'harm':all_harm.values(),
+         'clust':all_clust.values()
+        }
+    
+    large_df = pd.DataFrame.from_dict(x)
+    return large_df
 
-
+## pipeline to run sentinel experiments
+## 1. run S_runner based on chosen inputs
+## pipeline to create sentinle files
+## 1. create ranking .csv
+## 2. create centrality .csv
+## 3. avg distance/avg first moment
+## 4. combine all into one .csv
+## input: network-save-file to use 
+## pipeline for basic plots-so-far
+## -> compare d_F, d_I,d_T
+## -> compare d_{f,i,t} to centrality
+## greedy pipeline needed I think as well?
+## 1) okay - need to store n
+if __name__ == "__main__":
+    print("hi!")
+    season_var = sys.argv[1]
+    prop_data = sys.argv[2]
+    save_name = sys.argv[3]
+    df = find_node_stats(season_var,prop_data)
+    df.to_csv(save_name)
 
 
 

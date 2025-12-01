@@ -293,6 +293,8 @@ moment_df = moment_df.merge(out_avg_dist_df)
 moment_df = moment_df.merge(out_max_dist_df)
 cent_df = cent_df.rename(columns={"node_id":"NODE_ID"})
 moment_df = moment_df.merge(cent_df)
+
+#rank_fn = sys.argv[1]
 rank_df = pd.read_csv("results/ranked_table.csv")
 rank_df = rank_df.rename(columns={'sent':"NODE_ID"})
 moment_df = moment_df.merge(rank_df)

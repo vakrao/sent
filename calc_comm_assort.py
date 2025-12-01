@@ -27,7 +27,6 @@ def comm_density(node_comm_dict,in_bond,out_bond):
 
 
     N_comms,w = {},{}
-    print(len(set(node_comm_dict.keys())))
     for i in node_comm_dict:
         c = node_comm_dict[i]
         if c not in N_comms:
