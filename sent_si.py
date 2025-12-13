@@ -65,11 +65,6 @@ def read_property_data (filename):
 
 
 
-########
-
-### tau = 365 
-### (each week to give some number of infections) 
-### 
 
 
 """
@@ -96,9 +91,6 @@ def determine_time_increment (min_value,state, in_bond, beta_bet, beta_wit,tau=3
                 if min_inc > frac:
                     min_inc = frac
     return min_inc
-
-
-#####
 
 
 """
@@ -146,11 +138,16 @@ def compute_variation (old_state, in_bond,prop_size, beta_bet, beta_wit, dt,F,ta
 
 
 
-def update_sent_stats(state, time, D, T, d_t,d_i):
+"""
+    
+"""
+def update_sent_stats(state, time, D, T, d_t,d_i,infec_ids,all_ids):
 
     infected_farms = 0
     new_infec = set()
     new_t,new_i = copy.deepcopy(d_t),copy.deepcopy(d_i)
+    # infec_scores is the infected 
+    infec_labs = copy.deepcopy(infec_ids)
     for n in state:
         if state[n]  > D:
             infected_farms += 1.0
@@ -163,8 +160,9 @@ def update_sent_stats(state, time, D, T, d_t,d_i):
     for n in new_infec:
         if n in d_i:
             new_i[n] = infected_farms
+            infec_labs[n] = all_ids - copy.deepcopy(infec_ids[n]) 
 
-    return new_t,new_i,infected_farms
+    return new_t,new_i,infected_farms,infec_labs
 
 
 
@@ -175,9 +173,24 @@ reference for months associated with seasons
     aut_months = ["03","04","05"]
     wint_months = ["06","07","08"]
     spring_months = ["09","10","11"]
+    """
 """
-"""
-    deltaT = 1 or 3 or 12
+inputs:
+    in_bond (dict)
+    out_bond (dict)
+    net_file (str),
+    prop_size(dict),
+    b_b (float),
+    b_w (float),
+    D (float),
+    T (float),
+    seeds (list),
+    max_infected (float),
+    deltaT (int),
+    alpha (float),
+    F (float),
+    init_month,
+
     init_seed = amount to initialize seed at start
 """
 def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T, max_infected,deltaT,min_inc,alpha,F,init_month):
@@ -193,6 +206,7 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
     state = {}
     x, y, z = [], [], []
     d_c, d_i,d_t,d_f = {},{},{},{}
+    infec_labs = {}
     i_inf = 0
     month_counter = 0 
     day_counter = 1
@@ -227,9 +241,11 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
     if isinstance(seeds,list) == False:
         seeds = [seeds]
     start_infec = 0
+
     ##state must be initialized from full network
     for n in in_bond:
         state[n] = float(0.0)
+        infec_labs[n] = set()
         if n not in seeds:  
             d_t[n] = 0
             d_c[n] = 0
@@ -237,6 +253,7 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
             d_f[n] = 0
     for n in out_bond:
         state[n]  = float(0.0)
+        infec_labs[n] = set()
         if n not in seeds:
             d_t[n] = 0
             d_c[n] = 0
@@ -251,7 +268,9 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
     t = 0.0
 
 
-    d_t,d_i,infected_farms = update_sent_stats(state, t, D,T, d_t,d_i)
+    infec_ids = set()
+    all_nodes = set(state.keys())
+    d_t,d_i,infected_farms,infec_labs = update_sent_stats(state, t, D,T, d_t,d_i,infec_labs,all_nodes)
     b_b = float(b_b)
     b_w = float(b_w)
     tau = float(tau)
@@ -282,11 +301,13 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
         day_counter += dt
         new_state= compute_variation (old_state, in_bond,prop_size, b_b, b_w, dt,F,tau)
 
-        new_dt,new_di,infected_farms = update_sent_stats(new_state, t, D,T, d_t,d_i)
+        new_dt,new_di,infected_farms,new_labs= update_sent_stats(new_state, t, D,T, d_t,d_i,infec_labs,all_nodes)
         d_t = new_dt
         d_i = new_di
+        infec_labs = copy.deepcopy(new_labs)
         state = copy.deepcopy(new_state)
         new_state = {}
+
         if day_counter == curr_month_amount and deltaT < 12:
             assert(day_counter == days[curr_month])
             month_counter += 1
@@ -348,9 +369,5 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
             d_f[c] = 0
             d_t[c] = 0
 
-        #if d_i[c] != start_infec:
-        #    d_c[c] = i_inf - d_i[c]
-        #else:
-        #    d_c[c] = i_inf 
+    return d_i,d_t,d_c,d_f,infec_labs
 
-    return d_i,d_t,d_c,d_f

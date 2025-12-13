@@ -39,16 +39,19 @@ def si_worker(inputs):
     min_inc = 1
     month_convert = {0:2,1:1,2:12,3:11,4:10,5:9,6:8}
     cal_month = month_convert[shifts]
-    d_i,d_t,d_c,d_f= sent_si_model(in_bond, out_bond,net_file, prop_size, b_b, b_w, d, seed, T, max_infected,deltaT,min_inc,alpha,P,cal_month)
+    d_i,d_t,d_c,d_f,labels= sent_si_model(in_bond, out_bond,net_file, prop_size, b_b, b_w, d, seed, T, max_infected,deltaT,min_inc,alpha,P,cal_month)
     scc_seeds = seed_in_scc(in_bond,out_bond)
     s_list = {}
     #now, get monthly data 
+    loc_labels = list()
+    all_n,all_seeds,all_sents = list(),list(),list()
     for n in d_i:
         if n in scc_seeds:
             d_ni = d_i[n]
             d_nc = d_c[n]
             d_nt = d_t[n]
             d_nf = d_f[n]
+            i_l = labels[n]
             s_list = {
                     'sentinel':n,
                     'seed':seed,
@@ -62,8 +65,26 @@ def si_worker(inputs):
                     'b_w':b_w,
                     'write_folder':write_folder,
                     'shift':shifts}
+            # all the labels associated with a node
+            for label_val in i_l:
+                loc_labels.append(label_val)
+                all_n.append(n)
+                all_seeds.append(seed)
+            # do a seprate save for each seed
+            # saving associated labels
             local_write(s_list)
+    # now, save all the labels 
+    # and save associated seeds 
+    lab_dict = {"sent":all_n,"seed":all_seeds,"lab":loc_labels}
+    lab_write(lab_dict,seed,lab_folder)
+
     return s_list
+
+def lab_write(write_list,seed_id,lab_folder):
+    if len(write_list["sent"]) > 0:
+        write_file = lab_folder + seed_id+".csv"
+        lab_df = pd.DataFrame.from_dict(write_list)
+        lab_df.to_csv(write_file,mode='w',header=True)
 
         
 def local_write(write_list):
@@ -108,6 +129,7 @@ if __name__ == '__main__':
     all_D = params.get("D")
     all_D = [float(q) for q in all_D]
     T = params.get("T")
+    lab_folder = params.get("lab_folder")
     param_deltaT  = params.get("deltaT")
     if isinstance(param_deltaT,list):
         all_deltaT = [int(t) for t in param_deltaT]
@@ -161,6 +183,7 @@ if __name__ == '__main__':
                                             'alpha':alpha,
                                             'shift_val':shift_val,
                                             'write_folder':write_folder,
+                                            'lab_folder':lab_folder,
                                             'net_file':net_file
                                         }
                                     all_params.append(params)

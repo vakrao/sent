@@ -10,13 +10,20 @@ import seaborn as sns
 import sys
 
 
+
 seas = sys.argv[1]
+compare = False
+if seas == "both":
+    compare = True
+    seas = "y"
+    fig_x,fig_y = 3,3
 rank_path = "data/"+seas+"_rank.csv"
 rank_df = pd.read_csv(rank_path)
 cent_path = "data/"+seas+"_cent.csv"
 cent_df = pd.read_csv(cent_path)
 cent_df = cent_df.rename(columns={'node_id':'sent'})
 agg = rank_df.merge(cent_df,on="sent")
+
 
 if seas == "m":
     marker = "x"
@@ -25,49 +32,94 @@ if seas == "s":
 if seas == "y":
     marker = "o"
 # Run for R_F vs R_T
-#scatter_rank_true(r_f, r_t, r"$R_F$", r"$R_T$", "rank_RF_vs_RT_true.png", jitter=0.15)
-#scatter_rank_true(r_f, r_i, r"$R_F$", r"$R_I$", "rank_RF_vs_RI_true.png", jitter=0.15)
-#scatter_rank_true(r_i, r_t, r"$R_I$", r"$R_T$", "rank_RI_vs_RT_true.png", jitter=0.15)
-f = np.asarray(agg["dF_sum"], dtype=float)
-i = np.asarray(agg["dI_mean"], dtype=float)
-t = np.asarray(agg["dT_mean"], dtype=float)
+f_y = np.asarray(agg["dF_sum"], dtype=float)
+i_y = np.asarray(agg["dI_mean"], dtype=float)
+t_y = np.asarray(agg["dT_mean"], dtype=float)
 
 pairs = [
-    (f, i, r"$F$", r"$I$"),
-    (f, t, r"$F$", r"$T$"),
-    (i, t, r"$I$", r"$T$")
-]
+        (f_y, i_y, r"$F_Y$", r"$I_Y$"),
+        (f_y,t_y, r"$F_Y$", r"$T_Y$"),
+        (i_y,t_y,  r"$I_Y$", r"$T_Y$")
+        ]
+
 
 fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-for ax, (x, y, xlab, ylab) in zip(axes, pairs):
-    mask = np.isfinite(x) & np.isfinite(y)
-    x, y = x[mask], y[mask]
-   
-    ax.scatter(x, y, s=20, alpha=0.55,marker=marker)
-    
-    # consistent limits and inverted orientation
-    r_min, r_max = 0, 1
-   
-    ax.plot([r_min, r_max], [r_min, r_max], "--", color="k", lw=1)
-    
-   # ax.set_xlim(r_max, r_min)
-   # ax.set_ylim(r_max, r_min)
-   
-    # axis labels and title
-    if xlab == "F":
-        ax.set_xlabel(f"{xlab} (larger = better → right)",size=20)
-    ax.set_ylabel(f"{ylab} (lower = better → down)",size=20)
-    ax.tick_params(axis="both",labelsize=18)
-    ax.set_title(f"{xlab} vs {ylab}")
-    ax.grid(True, linestyle="--", alpha=0.3)
+if compare == True:
+    fig, axs = plt.subplots(fig_x,fig_y, figsize=(15,10))
+    m_fp = "data/m_rank.csv"
+    s_fp = "data/s_rank.csv"
+    m_dat =pd.read_csv(m_fp)
+    s_dat =pd.read_csv(s_fp)
+    f_s = np.asarray(s_dat["dF_sum"], dtype=float)
+    i_s = np.asarray(s_dat["dI_mean"], dtype=float)
+    t_s = np.asarray(s_dat["dT_mean"], dtype=float)
+    f_m = np.asarray(m_dat["dF_sum"], dtype=float)
+    i_m = np.asarray(m_dat["dI_mean"], dtype=float)
+    t_m = np.asarray(m_dat["dT_mean"], dtype=float)
+    pairs = [
+        (f_y, f_s, r"$F_Y$", r"$F_S$"),
+        (i_y,i_s, r"$I_Y$", r"$I_S$"),
+        (t_y,t_s,  r"$T_Y$", r"$T_S$"),
+        (f_y, f_m, r"$F_Y$", r"$F_M$"),
+        (i_y,i_m , r"$I_Y$", r"$I_M$"),
+        (t_y,t_m,  r"$T_S$", r"$T_M$"),
+        (f_s, f_m, r"$F_S$", r"$F_M$"),
+        (i_s,i_m , r"$I_S$", r"$I_M$"),
+        (t_s,t_m,  r"$T_S$", r"$T_M$")
+    ]
 
-    # tick marks every 250 ranks
-    #ticks = np.arange(1500, -1, -250)
-    #ax.set_xticks(ticks)
-    #ax.set_yticks(ticks)
+if compare == True:
+    counter = 0
+    for i in range(0,fig_x):
+        for j in range(0,fig_y):
+            x,y = pairs[counter][0],pairs[counter][1] 
+            xlab,ylab = pairs[counter][2],pairs[counter][3]
+            axs[i,j].scatter(x, y, s=20, alpha=0.55,marker=marker)
+            
+            # consistent limits and inverted orientation
+            r_min, r_max = 0, 1
+       
+#            axs.plot([r_min, r_max], [r_min, r_max], "--", color="k", lw=1)
+            
+       
+            # axis labels and title
+            axs[i,j].set_xlabel(f"{xlab}",size=24)
+            axs[i,j].set_ylabel(f"{ylab}",size=24)
+            axs[i,j].tick_params(axis="both",labelsize=18)
+            axs[i,j].set_title(f"{xlab} vs {ylab}",size=32)
+            axs[i,j].grid(True, linestyle="--", alpha=0.3)
+            counter += 1
+else:
+
+
+    for ax, (x, y, xlab, ylab) in zip(axes, pairs):
+        mask = np.isfinite(x) & np.isfinite(y)
+        x, y = x[mask], y[mask]
+       
+        ax.scatter(x, y, s=20, alpha=0.55,marker=marker)
+        
+        # consistent limits and inverted orientation
+        r_min, r_max = 0, 1
+       
+        ax.plot([r_min, r_max], [r_min, r_max], "--", color="k", lw=1)
+        
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+       # ax.set_xlim(r_max, r_min)
+       # ax.set_ylim(r_max, r_min)
+       
+        # axis labels and title
+        ax.set_xlabel(f"{xlab}",size=22)
+        ax.set_ylabel(f"{ylab}",size=22)
+        ax.tick_params(axis="both",labelsize=18)
+        ax.set_title(f"{xlab} vs {ylab}")
+        ax.grid(True, linestyle="--", alpha=0.3)
+
 
 compare_fig = "results/"+seas+"/"+seas+"_rank_compare.png"
+if compare == True:
+    compare_fig = "results/all_temp_rank_compare.png"
 plt.tight_layout()
 plt.savefig(compare_fig, dpi=300, bbox_inches="tight")
 plt.show()
@@ -125,19 +177,3 @@ for m in metrics:
     save_name = "results/"+seas+"/"+seas+y_lab+"_cent_loglog.png"
     plt.tight_layout()
     plt.savefig(save_name, dpi=300, bbox_inches="tight")
-    """
-    corrs = []
-    for col, label in metric_map.items():
-        subdf = agg[[col, "dF_sum"]].dropna()
-        subdf = subdf[(subdf[col] > 0) & (subdf["dF_sum"] > 0)]
-        #pearson_corr, _ = pearsonr(subdf[col], subdf["dF_sum"])
-        #spearman_corr, _ = spearmanr(subdf[col], subdf["dF_sum"])
-        #corrs.append({"Metric": label, "Pearson": pearson_corr, "Spearman": spearman_corr})
-    
-    #corr_df = pd.DataFrame(corrs).sort_values("Spearman", ascending=False)
-    #display(corr_df)
-    """
-    
-
-
-

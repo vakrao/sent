@@ -166,7 +166,6 @@ def find_node_stats(season_var,prop_fn):
 ## greedy pipeline needed I think as well?
 ## 1) okay - need to store n
 if __name__ == "__main__":
-    print("hi!")
     season_var = sys.argv[1]
     prop_data = sys.argv[2]
     save_name = sys.argv[3]

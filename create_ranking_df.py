@@ -13,17 +13,17 @@ def normalize_sent_metrics(rank_file):
     # Get Full Outbreak Size
     new_df["real_os"] = list(outbreak_sizes)
     ranked_data = ranked_data.merge(new_df,left_on="seed",right_on="seed")
-    ranked_data = ranked_data[ranked_data["o_s"] > 0]
-    out_sizes = [ x for x in list(outbreak_sizes)  if x > 0 ]
+    #ranked_data = ranked_data[ranked_data["o_s"] > 0]
+    #out_sizes = [ x for x in list(outbreak_sizes)  if x > 0 ]
     # Count Number of times
-    just_zero = ranked_data[ranked_data['o_s'] == 0].groupby(['seed']).size().rename('n_outbreaks')
-    zero_ids = list(just_zero.index)
     seed_amount = len(set(ranked_data["seed"]))
     ## if an outbreak occurs - what is probability of detecting it for a given sentinel?
     g_zero = (ranked_data.groupby(["seed"])["real_os"].agg("max"))
     full_time = max(list(ranked_data["d_t"]))
+    num_sents = len(list(ranked_data["sent"]))
+    ranked_data = ranked_data[ranked_data["d_t"] > 0]
     ranked_data["norm_dt"] = ranked_data["d_t"] / full_time
-    ranked_data["norm_di"] = ranked_data["d_i"] / ranked_data["real_os"]
+    ranked_data["norm_di"] = (ranked_data['d_c'])/(ranked_data["o_s"])
     ranked_data["norm_df"] = ((ranked_data["d_f"]) / seed_amount)
     agg = ranked_data.groupby("sent", as_index=True).agg(
         dF_sum=("norm_df", "sum"),     # total detections (higher better)
