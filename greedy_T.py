@@ -11,35 +11,30 @@ import os
         1 -> sentinel protects 
     returns dict{(sent,seed)} = set(protected_labels)
 """
-def create_seed_matrix(folder):
-    all_filepaths = glob.glob(folder)
-    seed_dict = {}
-    for seed_path in all_filepaths:
-        sent_data = pd.read_csv(seed_path)
-        # for each seed, 2-d matrix of sent-label values
-        all_sents = set(sent_data["sent"])
-        all_nodes = set(sent_data["seed"])
-        for i in all_sents:
-            for j in all_nodes:
-                seed_dict[(i,j)] = list()
-        x,y,z = list(sent_data["sent"]),list(sent_data["seed"]),list(sent_data["lab"])
-        old_sent,old_seed = x[0],y[0]
-        count_labs = list()
-        for i in range(0,len(x)):
-            sent_det,lab_prot = x[i],y[i]
-            if old_sent == sent_det and old_seed == lab_prot: 
-                count_labs.append(z[i])
-            else:
-#                seed_dict[old_seed] = {}
-#                seed_dict[old_seed][old_sent] = count_labs
-                seed_dict[(old_sent,old_seed)] = copy.deepcopy(count_labs)
-                count_labs = [z[i]]
-            old_sent,old_seed = sent_det,lab_prot
-    return seed_dict
+
 """
 Return the id-values of all seeds associated with a sentinel
 """
-def greedy_I(seed_dict,num_add):
+def choose_metric(fn,m):
+    metrics = {"I":"d_c","F":"d_f","T":"d_t"}
+    sent_data = pd.read_csv(fn)
+    sent_vals = list(sent_data["sent"])
+    seed_vals = list(sent_data["seed"])
+    seed_ids = set(sent_data["seed"])
+    sent_ids = set(sent_data["sent"])
+    dt_vals = list(sent_data[metrics[m]])
+    all_ids = {}
+    for id_val in sent_ids:
+        all_ids[id_val] = {'d_T':float('inf'),'sent_id':1}
+    for i in range(0,len(sent_vals)):
+        if (dt_vals[i] > 0 and (seed_vals[i] != sent_vals[i])):
+            if all_ids[seed_vals[i]] > dt_vals[i]:
+                all_ids[seed_vals[i]] = {'d_T':dt_vals[i],'sent_id':sent_vals[i]}
+    return all_ids
+"""
+Return the id-values of all seeds associated with a sentinel
+"""
+def greedy_T(seed_dict,num_add):
     pair_vals = list(seed_dict.keys())
     all_sents,all_nodes = set(),set()
     for p in pair_vals:
@@ -48,18 +43,14 @@ def greedy_I(seed_dict,num_add):
 
     best_sent = {}
 
-    for y in all_sents:
-        best_sent[y] = set()
+    for seed_val in seed_dict:
+        best_sent[seed_dict[seed_val]['sent_id']] = set()
     
-    for seed_val in all_nodes:
+    best_sent = {}
+    for seed_val in seed_dict:
         max_val,max_id = 0,"hi"
-        for sent_val in all_sents:
-            if((sent_val,seed_val) in seed_dict):
-                if len(seed_dict[(sent_val,seed_val)]) > max_val:
-                    max_val = len(seed_dict[(sent_val,seed_val)])
-                    max_id = sent_val
-        if max_id != "hi":
-            best_sent[max_id].add(seed_val)
+        min_pair = seed_dict[seed_val]
+        best_sent[min_pair['sent_id']].append(seed_val)
 
     # now, choose best-sentinel
     max_val,max_id = 0,"hi"
@@ -121,9 +112,10 @@ def greedy_I(seed_dict,num_add):
 
 
             
-def best_deg(year_cent,seed_dict,cent_type,num_add):
+def best_deg(fn,seed_dict,cent_type,num_add):
 
     cent_title = cent_type+"_I_add.csv"
+    I_dict = avg_infec(fn)
     cent_df = pd.read_csv(year_cent)
     cent_df = cent_df.sort_values(by=[cent_type],ascending=False)
 
@@ -134,7 +126,7 @@ def best_deg(year_cent,seed_dict,cent_type,num_add):
     old_avg = 0
     counter = 0
     all_ids = []
-    best_sent = {}
+    sent_
 
     pair_vals = list(seed_dict.keys())
     all_sents,all_nodes = set(),set()

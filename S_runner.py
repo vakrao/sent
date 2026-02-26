@@ -45,6 +45,7 @@ def si_worker(inputs):
     #now, get monthly data 
     loc_labels = list()
     all_n,all_seeds,all_sents = list(),list(),list()
+    loc_times = list()
     for n in d_i:
         if n in scc_seeds:
             d_ni = d_i[n]
@@ -70,12 +71,13 @@ def si_worker(inputs):
                 loc_labels.append(label_val)
                 all_n.append(n)
                 all_seeds.append(seed)
+                loc_times.append(d_t[label_val])
             # do a seprate save for each seed
             # saving associated labels
             local_write(s_list)
     # now, save all the labels 
     # and save associated seeds 
-    lab_dict = {"sent":all_n,"seed":all_seeds,"lab":loc_labels}
+    lab_dict = {"sent":all_n,"seed":all_seeds,"lab":loc_labels,"time":loc_times}
     lab_write(lab_dict,seed,lab_folder)
 
     return s_list

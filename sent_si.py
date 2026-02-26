@@ -153,7 +153,8 @@ def update_sent_stats(state, time, D, T, d_t,d_i,infec_ids,all_ids):
             infected_farms += 1.0
             if n not in d_i:
                 continue
-            if d_t[n] == 0 :
+            # records when a node becomes infected
+            if d_t[n] == 0:
                 new_t[n] = time
                 new_infec.add(n)
     # go through all newly-infected farms, and update d_i
@@ -301,12 +302,16 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
         day_counter += dt
         new_state= compute_variation (old_state, in_bond,prop_size, b_b, b_w, dt,F,tau)
 
-        new_dt,new_di,infected_farms,new_labs= update_sent_stats(new_state, t, D,T, d_t,d_i,infec_labs,all_nodes)
-        d_t = new_dt
-        d_i = new_di
+        new_dt,new_di,infected_farms,new_labs = update_sent_stats(new_state, t, D,T, d_t,d_i,infec_labs,all_nodes)
+        d_t = copy.deepcopy(new_dt)
+        d_i = copy.deepcopy(new_di)
         infec_labs = copy.deepcopy(new_labs)
         state = copy.deepcopy(new_state)
         new_state = {}
+        del(new_dt)
+        del(new_di)
+        del(new_labs)
+        del(new_state)
 
         if day_counter == curr_month_amount and deltaT < 12:
             assert(day_counter == days[curr_month])
@@ -359,15 +364,24 @@ def sent_si_model (in_bond, out_bond,net_file, prop_size, b_b, b_w, D, seeds, T,
                     curr_month = next_month
                 month_counter =0 
     i_inf = infected_farms
+    all_infec_ids = set()
+    prot_nodes_dict = {}
     for c in d_i:
+        prot_nodes_dict[c] = []
         if d_i[c] != start_infec:   
             d_c[c] = i_inf - d_i[c]
             d_f[c] = 1
+            all_infec_ids.add(c)
         else:
             d_i[c] = 0
             d_c[c] = 0
             d_f[c] = 0
             d_t[c] = 0
+    for a in all_infec_ids:
+        protected_nodes = all_infec_ids.intersection(infec_labs[a])
+        prot_nodes_dict[a] = list(protected_nodes)
 
-    return d_i,d_t,d_c,d_f,infec_labs
+
+
+    return d_i,d_t,d_c,d_f,prot_nodes_dict
 
