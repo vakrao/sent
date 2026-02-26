@@ -11,3 +11,11 @@ rule plot_ranks:
         "results/{seas}/"
     shell: 
         "python3 plot_ranks.py {input}"
+
+rule plot_both_ranks:
+    input:
+        "both"
+    output: 
+        "results/all_temp_rank_compare.png"
+    shell: 
+        "python3 plot_ranks.py {input}"
