@@ -19,12 +19,12 @@ def classify_comms():
 """
 Return the id-values of all seeds associated with a sentinel
 """
-def choose_metric(fn,m):
+def choose_freq(fn):
     metrics = {"I":"d_c","F":"d_f","T":"d_t"}
     sent_data = pd.read_csv(fn)
     sent_vals = list(sent_data["sent"])
     seed_vals = list(sent_data["seed"])
-    df_vals = list(sent_data[metrics[m]])
+    df_vals = list(sent_data["d_f"]])
     all_ids = {}
     for i in range(0,len(sent_vals)):
         sentinel = sent_vals[i]

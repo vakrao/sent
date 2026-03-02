@@ -15,106 +15,81 @@ import os
 """
 Return the id-values of all seeds associated with a sentinel
 """
-def choose_metric(fn,m):
-    metrics = {"I":"d_c","F":"d_f","T":"d_t"}
+def find_time_dict(fn):
     sent_data = pd.read_csv(fn)
     sent_vals = list(sent_data["sent"])
     seed_vals = list(sent_data["seed"])
     seed_ids = set(sent_data["seed"])
     sent_ids = set(sent_data["sent"])
-    dt_vals = list(sent_data[metrics[m]])
+    dt_vals = list(sent_data["d_t"])
     all_ids = {}
-    for id_val in sent_ids:
-        all_ids[id_val] = {'d_T':float('inf'),'sent_id':1}
+    for id_val in seed_ids:
+        all_ids[id_val] = {'d_t':float('inf'),'sent_id':set()}
     for i in range(0,len(sent_vals)):
-        if (dt_vals[i] > 0 and (seed_vals[i] != sent_vals[i])):
-            if all_ids[seed_vals[i]] > dt_vals[i]:
-                all_ids[seed_vals[i]] = {'d_T':dt_vals[i],'sent_id':sent_vals[i]}
-    return all_ids
+        if float(dt_vals[i]) > 0) and (str(seed_vals[i]) != str(sent_vals[i])):
+            if float(all_ids[seed_vals[i]]["d_t"]) > float(dt_vals[i]):
+                all_ids[seed_vals[i]]['d_t'] = dt_vals[i]
+    for i in range(0,len(sent_vals)):
+        if float(dt_vals[i]) > 0) and (str(seed_vals[i]) != str(sent_vals[i])):
+            if float(all_ids[seed_vals[i]]["d_t"]) == float(dt_vals[i]):
+                # every seed has a best associated sentinel
+                all_ids[seed_vals[i]]['d_t'] = float(dt_vals[i])
+                all_ids[seed_vals[i]]['sent_id'].add(sent_vals[i])
+    best_ids = {}
+    for s in seed_ids:
+        best_ids[s] = set()
+    for s in seed_ids:
+        best_sents = all_ids[s]['sent_id']
+        for b in best_sents:
+            best_ids[b].add(s)
+        
+    return best_ids
 """
-Return the id-values of all seeds associated with a sentinel
+every seed has an associated
+sentinel that detects it earliest
+add tolerance band maybe - fastest x% 
 """
 def greedy_T(seed_dict,num_add):
     pair_vals = list(seed_dict.keys())
-    all_sents,all_nodes = set(),set()
-    for p in pair_vals:
-        all_sents.add(p[0])
-        all_nodes.add(p[1])
 
-    best_sent = {}
-
-    for seed_val in seed_dict:
-        best_sent[seed_dict[seed_val]['sent_id']] = set()
-    
-    best_sent = {}
-    for seed_val in seed_dict:
-        max_val,max_id = 0,"hi"
-        min_pair = seed_dict[seed_val]
-        best_sent[min_pair['sent_id']].append(seed_val)
-
-    # now, choose best-sentinel
-    max_val,max_id = 0,"hi"
-    for b in best_sent:
-        most_vals = len(best_sent[b])
-        if most_vals > max_val:
-            max_val = most_vals
-            max_id = b
-    # pick sentinles that protect
-    # most seeds
-    greedy_set = best_sent[max_id]
-    nodes_left = all_nodes - greedy_set
-    greedy_sents = set()
-    greedy_sents.add(max_id)
-    # now, need to find
-    # sentinels that best cover other seeds 
-
-    greedy_add = list()
-    greedy_add.append(len(greedy_set))
-    counter = 1
-    # find associated best-sentinel
-    # value with each seed 
-    # and count the increase  in 
-    # seed-ids associated with each seed
-    while counter < num_add:
-        best_sent = {}
-        for seed_val in nodes_left:
-            max_val,max_id = 0,"hi"
-            for sent_val in all_sents:
-                if( (sent_val,seed_val) in seed_dict):
-                    if len(seed_dict[(sent_val,seed_val)]) > max_val:
-                        max_val = len(seed_dict[(sent_val,seed_val)])
-                        max_id = sent_val
-            if max_id != "hi":
-                if max_id not in best_sent:
-                    best_sent[max_id] = set()
-                best_sent[max_id].add(seed_val)
-
-        max_val,max_id = 0,"hi"
-        for b in best_sent:
-            most_vals = len(best_sent[b])
-            if most_vals > max_val:
-                max_val = most_vals
-                max_id = b
-        greedy_set = greedy_set.union(best_sent[max_id])
-        
-        greedy_sents.add(max_id)
-        nodes_old = len(nodes_left)
-        # seed nodes left to protect
-        # are ones that greedy set still
-        # does not cover
-        nodes_left = all_nodes-greedy_set
-        nodes_add = nodes_old - len(nodes_left)
-        greedy_add.append(nodes_add)
-        counter += 1
-         
-    return greedy_sents,greedy_add
+    n = 0
+    total = 0
+    best_T,best_id = 0,""
+    temp_total = total
+    final_dict = {}
+    curr_set,total_add = set(),list()
+    for l in seed_dict:
+        num_saved = len(seed_dict[l])
+        if num_saved > best_T:
+            best_T = num_saved
+            best_id = l
+    curr_set.add(best_id)
+    saved_labs = set(seed_dict[l])
+    total_add.append(best_T)
+    n = 1
+    while n < num_add:
+        best_increase,best_add = 0,""
+        for l in seed_dict:
+            b = seed_dict[l]
+            lab_saved = len(b.difference(saved_labs))
+            if l not in curr_set and lab_saved > best_increase:
+                best_increase=lab_saved
+                best_add = l
+        if best_increase == 0:
+            break
+        curr_set.add(best_add)
+        total_add.append(best_increase)
+    final_dict["best_ids"] = list(curr_set)
+    final_dict["best_add"] = total_add
+           
+    return final_dict
 
 
 
             
 def best_deg(fn,seed_dict,cent_type,num_add):
 
-    cent_title = cent_type+"_I_add.csv"
+    cent_title = cent_type+"_T_add.csv"
     I_dict = avg_infec(fn)
     cent_df = pd.read_csv(year_cent)
     cent_df = cent_df.sort_values(by=[cent_type],ascending=False)
@@ -169,15 +144,13 @@ def best_deg(fn,seed_dict,cent_type,num_add):
     return all_df
 
 if __name__ == "__main__":
-    lab_folder= "data/y_lab/*.csv"
+    lab_folder= "data_y_real.csv"
     num_add = 20
-    seed_dict = create_seed_matrix(lab_folder)
-    sent_id,b_id,add_amount,total = [],[],[],[]
-#    greedy_sents,greedy_add = greedy_I(seed_dict,num_add)
+    time_dict = find_time_dict(lab_folder)
+    greedy_dict = greedy_T(time_dict,num_add)
     add_total = 0
     cent_type = "d"
-    year_fn= "data/y_cent.csv"
-    add_deg_df = best_deg(year_fn,seed_dict,cent_type,num_add)
+#    add_deg_df = best_deg(year_fn,seed_dict,cent_type,num_add)
     #for num in add_dict:
     #    add_id = add_dict[num][0]
     #    add_val = add_dict[num][1]
@@ -188,10 +161,9 @@ if __name__ == "__main__":
     #    total.append(add_total)
     ## create dictionary
 #    all_dict = {"sent_id":list(greedy_sents),"add_amount":list(greedy_add)}
-#    dict_title = "best_I_greedy.csv"
-    # now, lets just blind add best degree
-#    all_df = pd.DataFrame(all_dict)
-#    all_df.to_csv(dict_title)
+    dict_title = "best_T_greedy.csv"
+    greedy_df = pd.DataFrame(greedy_dict)
+    greedy_df.to_csv(dict_title)
 
 
 
