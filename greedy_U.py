@@ -130,19 +130,17 @@ def find_U(num_add,node_ids,alpha,F_dict,I_dict):
         if(node_id in unq_F):
             F_val = len(F_dict[node_id])
             f_set = F_dict[node_id]
-            f_lab =  F_dict[node_id]
         if(node_id in unq_I):
             I_val = len(unq_I[node_id])
             i_set = I_dict[node_id]
-            i_lab = I_dict[node_id]
         u_val = alpha*(F_val) + (1.0-alpha)*(I_val)
         if u_val > max_u and (node_id not in curr_set):
             max_u = u_val
             max_id = node_id
             if node_id in unq_F:
-                temp_f = len(F_dict[node_id])
+                temp_f = len(F_dict[node_id])/(len(node_ids))
             if node_id in unq_I:
-                temp_i = len(I_dict[node_id])
+                temp_i = len(I_dict[node_id])/(len(node_ids))
     curr_set.add(max_id)
     if max_id in node_ids:
         node_ids.remove(max_id)
@@ -151,6 +149,8 @@ def find_U(num_add,node_ids,alpha,F_dict,I_dict):
     u_sav.append(max_u)
     counter +=1 
 
+    f_lab = F_dict[max_id]
+    i_lab = I_dict[max_id]
     while counter < num_add:
         max_u,max_id = 0,""
         temp_i,temp_f = 0,0
@@ -160,10 +160,10 @@ def find_U(num_add,node_ids,alpha,F_dict,I_dict):
                 F_val,I_val = 0,0
                 if(node_id in F_dict):
                     F_diff = F_dict[node_id].difference(f_lab)
-                    F_val = len(F_diff)
+                    F_val = len(F_diff)/(len(node_ids))
                 if(node_id in I_dict):
                     I_diff = I_dict[node_id].difference(i_lab)
-                    I_val = len(I_diff)
+                    I_val = len(I_diff)/(len(node_ids))
                 u_val = alpha*(F_val) + (1.0-alpha)*(I_val)
                 if u_val > max_u:
                     max_u = u_val

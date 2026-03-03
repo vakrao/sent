@@ -56,13 +56,12 @@ def create_seed_matrix(folder,sent_ids,seed_ids):
                 if m in best_sent:
                     best_sent[m].add(seed_val)
                 else:
-                    best_sent[m] = [seed_val]
+                    best_sent[m] = set(seed_val)
     return best_sent
 """
 Return the id-values of all seeds associated with a sentinel
 """
-def greedy_I(seed_dict,num_add,seed_ids):
-    best_sent = list(seed_dict.keys())
+def greedy_I(best_sent,num_add,seed_ids):
     all_nodes = seed_ids
     # now, choose best-sentinel
     max_val,max_id = 0,"hi"
@@ -74,7 +73,6 @@ def greedy_I(seed_dict,num_add,seed_ids):
     # pick sentinels that protect
     # most seeds
     greedy_set = best_sent[max_id]
-    nodes_left = all_nodes - greedy_set
     greedy_sents = set()
     greedy_sents.add(max_id)
     # now, need to find
@@ -89,7 +87,6 @@ def greedy_I(seed_dict,num_add,seed_ids):
     # and count the increase  in 
     # seed-ids associated with each seed
     while counter < num_add:
-        best_sent = {}
         num_saved,max_saved = 0,0
         best_id = ""
         for s in best_sent:
