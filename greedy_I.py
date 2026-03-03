@@ -53,7 +53,10 @@ def create_seed_matrix(folder,sent_ids,seed_ids):
         if max_id != "hi":
             max_ids = valid_sents[max_val]
             for m in max_ids:
-                best_sent[m].add(seed_val)
+                if m in best_sent:
+                    best_sent[m].add(seed_val)
+                else:
+                    best_sent[m] = [seed_val]
     return best_sent
 """
 Return the id-values of all seeds associated with a sentinel
@@ -89,9 +92,9 @@ def greedy_I(seed_dict,num_add,seed_ids):
         best_sent = {}
         num_saved,max_saved = 0,0
         best_id = ""
-        for s in sent_nums:
-            best_labs = sent_nums[s]
-            num_saved = saved_labels.difference(best_labs)
+        for s in best_sent:
+            best_labs = best_sent[s]
+            num_saved = best_labs.difference(saved_labs)
             if num_saved > max_saved:
                 max_saved = num_saved
                 best_id = s
