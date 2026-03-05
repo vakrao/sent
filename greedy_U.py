@@ -9,21 +9,18 @@ import os
 Return the id-values of all seeds associated with a sentinel
 """
 def create_F_matrix(fn):
-    sent_data = pd.read_csv(fn)
-    sent_vals = list(sent_data["sent"])
-    seed_vals = list(sent_data["seed"])
-    df_vals = list(sent_data["d_f"])
     all_ids = {}
-    for i in range(0,len(sent_vals)):
-        sentinel = sent_vals[i]
-        all_ids[sentinel] = set()
-    for i in range(0,len(sent_vals)):
-        sentinel = sent_vals[i]
-        seed = seed_vals[i]
-        d_f = df_vals[i]
-        if d_f == 1:
-            all_ids[sentinel].add(seed)
-    
+    with open(seed_path, mode='r') as f:
+       reader = csv.DictReader(f) # Reads row by row
+       for row in reader:
+           sent_id = row['sent']
+           seed_id = row['seed']
+           label = row["lab"]
+           d_f = row["d_f"]
+           if sent_id not in all_ids:
+               all_ids[sent_id] = set()
+           if d_f == 1:
+               all_ids[sent_id].add(seed)
     return all_ids
 
 """
@@ -34,85 +31,36 @@ def create_F_matrix(fn):
     returns dict{(sent,seed)} = set(protected_labels)
 """
 def create_I_matrix(folder):
-    folder = folder+"*.csv"
+
     all_filepaths = glob.glob(folder)
     seed_dict = {}
     for seed_path in all_filepaths:
-        sent_data = pd.read_csv(seed_path)
-        # for each seed, 2-d matrix of sent-label values
-        all_sents = set(sent_data["sent"])
-        all_nodes = set(sent_data["seed"])
-        for i in all_sents:
-            for j in all_nodes:
-                seed_dict[(i,j)] = list()
-        x,y,z = list(sent_data["sent"]),list(sent_data["seed"]),list(sent_data["lab"])
-        old_sent,old_seed = x[0],y[0]
-        count_labs = list()
-        for i in range(0,len(x)):
-            sent_det,lab_prot = x[i],y[i]
-            if old_sent == sent_det and old_seed == lab_prot: 
-                count_labs.append(z[i])
-            else:
-                seed_dict[(old_sent,old_seed)] = copy.deepcopy(count_labs)
-                count_labs = [z[i]]
-            old_sent,old_seed = sent_det,lab_prot
+        with open(seed_path, mode='r') as f:
+           reader = csv.DictReader(f) # Reads row by row
+           for row in reader:
+               key = (row['sent'],row['seed'])
+               label = row["lab"]
+               if key not in seed_dict:
+                   seed_dict[key] = set()
+               seed_dict[key].add(label)
+
     best_sent = {}
-    for seed_val in all_nodes:
-        max_val,max_id = 0,"hi"
-        for sent_val in all_sents:
-            if((sent_val,seed_val) in seed_dict):
-                if len(seed_dict[(sent_val,seed_val)]) > max_val:
-                    max_val = len(seed_dict[(sent_val,seed_val)])
-                    max_id = sent_val
-        id_vals = []
-        for sent_val in all_sents:
-            if len(seed_dict[(sent_val,seed_val)]) ==  max_val:
-                id_vals.append(sent_val)
-        for i in id_vals:
-            if i not in best_sent:
-                best_sent[i] = set()
-            best_sent[i].add(seed_val)
-    for val in all_nodes:
-        if val not in best_sent:
-            best_sent[val] = []
+    max_sent_for_seed = {}
+    # find every sentinels associated seeds
+    for (sent_val,seed_val) in seed_dict.items():
+        num_saved = len(seed_dict[(sent_val,seed_val)])
+        if seed_val not in max_sent_for_seed or num_saved > max_sent_for_seed[seed_val][0]:
+            max_sent_for_seed[seed_val] = (num_saved,[sent_val])
+        elif num_saved ==  max_sent_for_seed[seed_val][0]:
+            max_sent_for_seed[seed_val][1].append(sent_val)
+
+    for seed_val in max_sent_for_seed:
+        max_ids = valid_sents[max_val][1]
+        for m in max_ids:
+            if m not in best_sent:
+                best_sent[m] = set()
+            best_sent[m].add(seed_val)
     return best_sent
-
-def find_F(curr_set,label_dict):
-
-    full_size = 0 
-    best_id = 0
-    det_labs = set()
-    for c in curr_set:
-        if c in label_dict:
-            l = set(label_dict[c])
-            det_labs = det_labs.union(l)
-
-    unq_F = 0 
-    unq_id = 0
-    unq_add = {}
-    for node in label_dict:
-        node_lab = set(label_dict[node])
-        unq_nodes = node_lab.difference(det_labs)
-        unq_add[node] = unq_nodes
-
-    return unq_add
-
-def find_I(curr_set,seed_dict):
-    # start with largest F value
-    full_size = 0 
-    best_id = 0
-    det_labs = set()
-    for c in curr_set:
-        if c in seed_dict:
-            l = set(seed_dict[c])
-            det_labs = det_labs.union(l)
-    unq_id = 0
-    unq_add = {}
-    for node in seed_dict:
-        node_lab = set(seed_dict[node])
-        unq_nodes = node_lab.difference(det_labs)
-        unq_add[node] = unq_nodes
-    return unq_add
 
 def find_U(num_add,node_ids,alpha,F_dict,I_dict):
 
@@ -125,67 +73,67 @@ def find_U(num_add,node_ids,alpha,F_dict,I_dict):
     f_set,i_set = set(),set()
     f_lab,i_lab = set(),set()
     temp_i,temp_f = 0,0
-    for node_id in node_ids:
-        F_val,I_val = 0,0
-        if(node_id in unq_F):
-            F_val = len(F_dict[node_id])
-            f_set = F_dict[node_id]
-        if(node_id in unq_I):
-            I_val = len(unq_I[node_id])
-            i_set = I_dict[node_id]
-        u_val = alpha*(F_val) + (1.0-alpha)*(I_val)
-        if u_val > max_u and (node_id not in curr_set):
-            max_u = u_val
-            max_id = node_id
-            if node_id in unq_F:
-                temp_f = len(F_dict[node_id])/(len(node_ids))
-            if node_id in unq_I:
-                temp_i = len(I_dict[node_id])/(len(node_ids))
-    curr_set.add(max_id)
-    if max_id in node_ids:
-        node_ids.remove(max_id)
-    f_sav.append(temp_f)
-    i_sav.append(temp_i)
-    u_sav.append(max_u)
-    counter +=1 
+    #for node_id in node_ids:
+    #    F_val,I_val = 0,0
+    #    if(node_id in F_dict):
+    #        F_val = len(F_dict[node_id])/(len(node_ids))
+    #        f_set = F_dict[node_id]
+    #    if(node_id in I_dict):
+    #        I_val = len(I_dict[node_id])/(len(node_ids))
+    #        i_set = I_dict[node_id]
+    #    u_val = alpha*(F_val) + (1.0-alpha)*(I_val)
+    #    if u_val > max_u and (node_id not in curr_set):
+    #        max_u = u_val
+    #        max_id = node_id
+    #        if node_id in F_dict:
+    #            temp_f = len(F_dict[node_id])/(len(node_ids))
+    #        if node_id in I_dict:
+    #            temp_i = len(I_dict[node_id])/(len(node_ids))
+    #curr_set.add(max_id)
+    #if max_id in node_ids:
+    #    node_ids.remove(max_id)
+    #f_sav.append(temp_f)
+    #i_sav.append(temp_i)
+    #u_sav.append(max_u)
+    #counter +=1 
 
-    f_lab = F_dict[max_id]
-    i_lab = I_dict[max_id]
+    f_lab = set()#F_dict[max_id]
+    i_lab = set()#I_dict[max_id]
     while counter < num_add:
         max_u,max_id = 0,""
         temp_i,temp_f = 0,0
         for node_id in node_ids:
+            F_diff,I_diff = set(),set()
+            F_val,I_val = 0,0
             if node_id not in curr_set:
-                F_diff,I_diff = 0,0
-                F_val,I_val = 0,0
                 if(node_id in F_dict):
                     F_diff = F_dict[node_id].difference(f_lab)
+                    print(F_diff)
                     F_val = len(F_diff)/(len(node_ids))
                 if(node_id in I_dict):
                     I_diff = I_dict[node_id].difference(i_lab)
                     I_val = len(I_diff)/(len(node_ids))
                 u_val = alpha*(F_val) + (1.0-alpha)*(I_val)
                 if u_val > max_u:
+                    print(F_diff)
                     max_u = u_val
                     max_id = node_id
-                    temp_f = len(F_diff)
-                    temp_i = len(I_diff)
+                    temp_f = F_diff
+                    temp_i = I_diff
         if max_id != "":
-            f_lab = f_lab.union(F_dict[max_id])
-            i_lab = i_lab.union(I_dict[max_id])
+            f_lab = f_lab.union(temp_f)
+            i_lab = i_lab.union(temp_i)
             curr_set.add(max_id)
             if max_id in node_ids:
                 node_ids.remove(max_id)
             print(temp_f)
             print(temp_i)
-            f_sav.append(temp_f)
-            i_sav.append(temp_i)
+            f_sav.append(len(temp_f))
+            i_sav.append(len(temp_i))
             u_sav.append(max_u)
         else:
             break
         counter +=1 
-
-
     save_dict = {"u_set":list(curr_set),"F":f_sav,"I":i_sav,"U":u_sav}
     return save_dict
 

@@ -2,61 +2,45 @@ import pandas as pd
 import numpy as np
 import glob as glob
 import copy
+import csv
 import os
 
 """
-    Creates adjacency matrix via nested dicitonaries
-    diciontary of seed_values (key:seed, value -> dictionary of sent_values)
+    Creates adjacency matrix via nested dictionaries 
+    d_values (key:seed, value -> dictionary of sent_values)
         dict of sent_values (key:sent: value -> 1/0)
         1 -> sentinel protects 
     returns dict{(sent,seed)} = set(protected_labels)
 """
-def create_seed_matrix(folder,sent_ids,seed_ids):
+def create_seed_matrix(folder):
     all_filepaths = glob.glob(folder)
     seed_dict = {}
-    for i in sent_ids:
-        for j in seed_ids:
-            seed_dict[(i,j)] = list()
-    # go through all seeds,sent pairs
     for seed_path in all_filepaths:
-        sent_data = pd.read_csv(seed_path)
-        all_sents = sent_ids
-        all_nodes = seed_ids
-        x,y,z = list(sent_data["sent"]),list(sent_data["seed"]),list(sent_data["lab"])
-        old_sent,old_seed = x[0],y[0]
-        count_labs = list()
-        for i in range(0,len(x)):
-            sent_det,lab_prot = x[i],y[i]
-            if old_sent == sent_det and old_seed == lab_prot: 
-                count_labs.append(z[i])
-            else:
-                seed_dict[(old_sent,old_seed)] = copy.deepcopy(count_labs)
-                count_labs = [z[i]]
-            old_sent,old_seed = sent_det,lab_prot
+        with open(seed_path, mode='r') as f:
+           reader = csv.DictReader(f) # Reads row by row
+           for row in reader:
+               key = (int(row['sent']),int(row['seed']))
+               label = int(row["lab"])
+               if key not in seed_dict:
+                   seed_dict[key] = set()
+               seed_dict[key].add(label)
 
     best_sent = {}
+    max_sent_for_seed = {}
     # find every sentinels associated seeds
-    for seed_val in seed_ids:
-        max_val,max_id = 0,"hi"
-        valid_sents = {}
-        for sent_val in sent_ids:
-            if((sent_val,seed_val) in seed_dict):
-                num_saved = len(seed_dict[(sent_val,seed_val)]) 
-                if num_saved > max_val:
-                    max_val = num_saved
-                    max_id = sent_val
-                    if max_val in valid_sents:
-                        valid_sents[max_val].append(max_id)
-                    else:
-                        valid_sents[max_val] = [max_id]
+    for (sent_val,seed_val) in seed_dict.items():
+        num_saved = len(seed_dict[(sent_val,seed_val)])
+        if seed_val not in max_sent_for_seed or num_saved > max_sent_for_seed[seed_val][0]:
+            max_sent_for_seed[seed_val] = (num_saved,[sent_val])
+        elif num_saved ==  max_sent_for_seed[seed_val][0]:
+            max_sent_for_seed[seed_val][1].append(sent_val)
 
-        if max_id != "hi":
-            max_ids = valid_sents[max_val]
-            for m in max_ids:
-                if m in best_sent:
-                    best_sent[m].add(seed_val)
-                else:
-                    best_sent[m] = set(seed_val)
+    for seed_val in max_sent_for_seed:
+        max_ids = valid_sents[max_val][1]
+        for m in max_ids:
+            if m not in best_sent:
+                best_sent[m] = set()
+            best_sent[m].add(seed_val)
     return best_sent
 """
 Return the id-values of all seeds associated with a sentinel
@@ -166,12 +150,18 @@ if __name__ == "__main__":
     year_fn= "data/y_cent.csv"
     year_dat = "data_y_real.csv"
     I_title = "best_I_greedy.csv"
-    sent_data = set(pd.read_csv(year_dat)["sent"])
-    seed_data = set(pd.read_csv(year_dat)["seed"])
+    seed_data,sent_data = set(),set()
+#    with open(year_dat,mode='r') as file:
+#        csvFile = csv.DictReader(file)
+#        for lines in csvFile:
+#           sent_data.add(lines["sent"]) 
+#           seed_data.add(lines["seed"]) 
+#    sent_data = set(pd.read_csv(year_dat)["sent"])
+#    seed_data = set(pd.read_csv(year_dat)["seed"])
     num_add = 20
-    seed_dict = create_seed_matrix(lab_folder,sent_data,seed_data)
+    seed_dict = create_seed_matrix(lab_folder)
     sent_id,b_id,add_amount,total = [],[],[],[]
-    greedy_sents,greedy_add = greedy_I(seed_dict,num_add)
+    greedy_sents,greedy_add = greedy_I(seed_dict,num_add,seed_data)
 
     add_total = 0
     cent_type = "d"
